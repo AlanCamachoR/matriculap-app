@@ -28,7 +28,11 @@ export default function DashboardPage() {
   const router = useRouter()
   const [matriculas, setMatriculas] = useState<Matricula[]>([])
   const [busqueda, setBusqueda] = useState('')
+  const [programa, setPrograma] = useState('')
+  const [semestre, setSemestre] = useState('')
   const [loading, setLoading] = useState(false)
+  const [programas, setProgramas] = useState<string[]>([])
+  const [semestres, setSemestres] = useState<string[]>([])
 
   useEffect(() => {
     if (status === 'unauthenticated') router.push('/login')
@@ -37,7 +41,7 @@ export default function DashboardPage() {
   useEffect(() => {
     const timer = setTimeout(() => fetchEstudiantes(), 300)
     return () => clearTimeout(timer)
-  }, [busqueda])
+  }, [busqueda, programa, semestre])
 
   useEffect(() => {
     fetchEstudiantes()
@@ -48,9 +52,20 @@ export default function DashboardPage() {
     try {
       const params = new URLSearchParams()
       if (busqueda) params.set('busqueda', busqueda)
+      if (programa) params.set('programa', programa)
+      if (semestre) params.set('semestre', semestre)
       const res = await fetch(`/api/estudiantes?${params}`)
       const json = await res.json()
-      setMatriculas(json.data || [])
+      const data = json.data || []
+      setMatriculas(data)
+
+      // Extraer opciones únicas para los filtros
+      if (!programa && !semestre && !busqueda) {
+        const progs = [...new Set(data.map((m: Matricula) => m.estudiantes?.programa).filter(Boolean))] as string[]
+        const sems = [...new Set(data.map((m: Matricula) => m.claves?.semestre).filter(Boolean))] as string[]
+        setProgramas(progs.sort())
+        setSemestres(sems.sort())
+      }
     } catch (e) {
       console.error(e)
     } finally {
@@ -85,16 +100,46 @@ export default function DashboardPage() {
       </header>
 
       <main className="max-w-7xl mx-auto px-4 py-6">
-        <div className="bg-white rounded-xl shadow-sm p-4 mb-6">
+        {/* Filtros */}
+        <div className="bg-white rounded-xl shadow-sm p-4 mb-6 flex flex-col md:flex-row gap-3">
           <input
             type="text"
             value={busqueda}
             onChange={(e) => setBusqueda(e.target.value)}
-            placeholder="Buscar por nombre o ID de estudiante..."
-            className="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            placeholder="Buscar por nombre o ID..."
+            className="flex-1 border border-gray-300 rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
+          <select
+            value={programa}
+            onChange={(e) => setPrograma(e.target.value)}
+            className="border border-gray-300 rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+          >
+            <option value="">Todos los programas</option>
+            {programas.map(p => (
+              <option key={p} value={p}>{p}</option>
+            ))}
+          </select>
+          <select
+            value={semestre}
+            onChange={(e) => setSemestre(e.target.value)}
+            className="border border-gray-300 rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+          >
+            <option value="">Todos los semestres</option>
+            {semestres.map(s => (
+              <option key={s} value={s}>{s}</option>
+            ))}
+          </select>
+          {(busqueda || programa || semestre) && (
+            <button
+              onClick={() => { setBusqueda(''); setPrograma(''); setSemestre('') }}
+              className="px-4 py-2.5 text-sm text-gray-500 hover:text-gray-700 border border-gray-300 rounded-lg"
+            >
+              Limpiar
+            </button>
+          )}
         </div>
 
+        {/* Tabla */}
         <div className="bg-white rounded-xl shadow-sm overflow-hidden">
           <div className="px-6 py-4 border-b border-gray-100 flex justify-between items-center">
             <h2 className="font-semibold text-gray-700">Estudiantes matriculados</h2>
