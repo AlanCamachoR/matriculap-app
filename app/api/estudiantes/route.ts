@@ -6,12 +6,14 @@ export async function GET(request: NextRequest) {
   const busqueda = searchParams.get('busqueda') || ''
   const programa = searchParams.get('programa') || ''
   const semestre = searchParams.get('semestre') || ''
+  const clave_id = searchParams.get('clave_id') || ''
 
   try {
     let qClaves = supabaseAdmin
       .from('claves')
       .select('id, clave, semestre, materia, docente, licenciatura, grupo')
 
+    if (clave_id) qClaves = qClaves.eq('id', clave_id)
     if (busqueda) qClaves = qClaves.or(`clave.ilike.%${busqueda}%,materia.ilike.%${busqueda}%,docente.ilike.%${busqueda}%`)
     if (semestre) qClaves = qClaves.eq('semestre', semestre)
     if (programa) qClaves = qClaves.eq('licenciatura', programa)

@@ -12,23 +12,21 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Faltan datos' }, { status: 400 })
     }
 
-    // Subir imagen a Supabase Storage
     const extension = imagen.name.split('.').pop()
     const filename = `acuse_${clave_id}_${Date.now()}.${extension}`
     const arrayBuffer = await imagen.arrayBuffer()
     const buffer = new Uint8Array(arrayBuffer)
 
     const { error: uploadError } = await supabaseAdmin.storage
-      .from('firmas')
+      .from('Firmas')
       .upload(filename, buffer, { contentType: imagen.type, upsert: true })
 
     if (uploadError) throw uploadError
 
     const { data: urlData } = supabaseAdmin.storage
-      .from('firmas')
+      .from('Firmas')
       .getPublicUrl(filename)
 
-    // Guardar firma del grupo
     const { data, error } = await supabaseAdmin
       .from('firmas')
       .upsert({
