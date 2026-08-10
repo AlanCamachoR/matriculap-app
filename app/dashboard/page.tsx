@@ -103,7 +103,6 @@ export default function DashboardPage() {
     }
   }
 
-  // Filtrar por estado
   const clavesFiltradas = claves.filter(c => {
     if (estado === 'firmado') return !!c.firma
     if (estado === 'pendiente') return !c.firma
@@ -127,14 +126,15 @@ export default function DashboardPage() {
           </div>
           <div className="flex items-center gap-4">
             <span className="text-sm text-gray-600">{user?.name}</span>
+            {(user?.role === 'admin' || user?.rol === 'admin') && (
+              <a href="/admin" className="text-sm text-purple-600 hover:text-purple-800 font-medium">⚙️ Admin</a>
+            )}
             <button onClick={() => signOut({ callbackUrl: '/login' })} className="text-sm text-red-500 hover:text-red-700">Cerrar sesión</button>
           </div>
         </div>
       </header>
 
       <main className="max-w-7xl mx-auto px-4 py-6">
-
-        {/* Tarjetas resumen */}
         <div className="grid grid-cols-3 gap-4 mb-6">
           <div className="bg-white rounded-xl shadow-sm p-4 text-center cursor-pointer hover:shadow-md transition" onClick={() => setEstado('')}>
             <p className="text-3xl font-bold text-gray-800">{claves.length}</p>
@@ -150,7 +150,6 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        {/* Filtros */}
         <div className="bg-white rounded-xl shadow-sm p-4 mb-6 flex flex-col md:flex-row gap-3">
           <input type="text" value={busqueda} onChange={(e) => setBusqueda(e.target.value)} placeholder="Buscar por clave, materia o docente..." className="flex-1 border border-gray-300 rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500" />
           <select value={programa} onChange={(e) => setPrograma(e.target.value)} className="border border-gray-300 rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white">
@@ -171,7 +170,6 @@ export default function DashboardPage() {
           )}
         </div>
 
-        {/* Lista de grupos */}
         <div className="bg-white rounded-xl shadow-sm overflow-hidden">
           <div className="px-6 py-4 border-b border-gray-100 flex justify-between items-center">
             <h2 className="font-semibold text-gray-700">Grupos</h2>
@@ -191,7 +189,7 @@ export default function DashboardPage() {
                       <span className="text-xs bg-blue-50 text-blue-600 px-2 py-0.5 rounded-full">{c.licenciatura}</span>
                     </div>
                     <p className="text-gray-800 font-medium mt-1">{c.materia}</p>
-                    <p className="text-gray-500 text-sm">{c.docente} · <span className="text-blue-500 hover:underline">{c.estudiantes.length} estudiantes</span></p>
+                    <p className="text-gray-500 text-sm">{c.docente} · <span className="text-blue-500 hover:underline">{c.estudiantes?.length || 0} estudiantes</span></p>
                   </div>
                   <div className="flex items-center gap-3">
                     {c.firma ? (
@@ -215,7 +213,6 @@ export default function DashboardPage() {
         </div>
       </main>
 
-      {/* Modal subir acuse */}
       {modal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-6">
@@ -224,7 +221,7 @@ export default function DashboardPage() {
                 <h2 className="font-bold text-gray-800 text-lg">Subir Acuse</h2>
                 <p className="text-sm font-mono text-blue-600 mt-1">{modal.clave}</p>
                 <p className="text-sm text-gray-600">{modal.materia}</p>
-                <p className="text-xs text-gray-400 mt-1">{modal.estudiantes.length} estudiantes serán marcados como firmados</p>
+                <p className="text-xs text-gray-400 mt-1">{modal.estudiantes?.length || 0} estudiantes serán marcados como firmados</p>
               </div>
               <button onClick={() => { setModal(null); setImagen(null); setPreview(null) }} className="text-gray-400 hover:text-gray-600 text-xl">✕</button>
             </div>
@@ -252,7 +249,6 @@ export default function DashboardPage() {
         </div>
       )}
 
-      {/* Modal ver acuse */}
       {verFirma && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-2xl p-6">
@@ -269,7 +265,6 @@ export default function DashboardPage() {
         </div>
       )}
 
-      {/* Modal ver estudiantes */}
       {verEstudiantes && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg p-6">
@@ -277,12 +272,12 @@ export default function DashboardPage() {
               <div>
                 <h2 className="font-bold text-gray-800 text-lg">{verEstudiantes.clave}</h2>
                 <p className="text-sm text-gray-600">{verEstudiantes.materia}</p>
-                <p className="text-xs text-gray-400">{verEstudiantes.docente} · {verEstudiantes.estudiantes.length} estudiantes</p>
+                <p className="text-xs text-gray-400">{verEstudiantes.docente} · {verEstudiantes.estudiantes?.length || 0} estudiantes</p>
               </div>
               <button onClick={() => setVerEstudiantes(null)} className="text-gray-400 hover:text-gray-600 text-xl">✕</button>
             </div>
             <div className="max-h-96 overflow-y-auto divide-y divide-gray-100">
-              {verEstudiantes.estudiantes.map((e, i) => (
+              {verEstudiantes.estudiantes?.map((e, i) => (
                 <div key={e.id} className="py-2.5 flex items-center gap-3">
                   <span className="text-xs text-gray-400 w-6">{i + 1}</span>
                   <div>

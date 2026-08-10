@@ -12,30 +12,40 @@ export async function GET() {
     if (error) throw error
     return NextResponse.json({ data })
   } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 500 })
+    return NextResponse.json({ error: error.message, details: JSON.stringify(error) }, { status: 500 })
   }
 }
 
 export async function POST(request: NextRequest) {
   try {
-    const { email, password, nombre, rol, licenciatura } = await request.json()
+    const body = await request.json()
+    const { email, password, nombre, rol, licenciatura } = body
 
     if (!email || !password || !nombre) {
-      return NextResponse.json({ error: 'Faltan datos' }, { status: 400 })
+      return NextResponse.json({ error: 'Faltan datos obligatorios' }, { status: 400 })
     }
 
     const hash = await bcrypt.hash(password, 10)
 
     const { data, error } = await supabaseAdmin
       .from('usuarios')
-      .insert({ email, password_hash: hash, nombre, rol: rol || 'profesor', licenciatura })
+      .insert({
+        email,
+        password_hash: hash,
+        nombre,
+        rol: rol || 'profesor',
+        licenciatura: licenciatura || null,
+      })
       .select('id, email, nombre, rol, licenciatura')
       .single()
 
-    if (error) throw error
+    if (error) {
+      return NextResponse.json({ error: error.message, details: JSON.stringify(error) }, { status: 400 })
+    }
+
     return NextResponse.json({ ok: true, data })
   } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 500 })
+    return NextResponse.json({ error: error.message, details: JSON.stringify(error) }, { status: 500 })
   }
 }
 
@@ -48,7 +58,10 @@ export async function DELETE(request: NextRequest) {
       .delete()
       .eq('id', id)
 
-    if (error) throw error
+    if (error) {
+      return NextResponse.json({ error: error.message }, { status: 400 })
+    }
+
     return NextResponse.json({ ok: true })
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 })
