@@ -21,12 +21,15 @@ export default function AdminPage() {
   const [form, setForm] = useState({ email: '', password: '', nombre: '', rol: 'profesor', licenciatura: '' })
   const [guardando, setGuardando] = useState(false)
   const [error, setError] = useState('')
+  const [actualizando, setActualizando] = useState(false)
+  const [resultadoActualizacion, setResultadoActualizacion] = useState<any>(null)
 
   const licenciaturas = [
     'Arquitectura',
     'Arquitectura de Interiores',
     'Cine y Televisión',
     'Comunicación Visual',
+    'Computación Creativa',
     'Diseño Industrial',
     'Diseño Textil y Moda',
     'Mercadotecnia y Publicidad',
@@ -91,6 +94,34 @@ export default function AdminPage() {
     }
   }
 
+  const handleActualizarMatricula = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setActualizando(true)
+    setResultadoActualizacion(null)
+    try {
+      const formData = new FormData()
+      formData.append('archivo', file)
+      const res = await fetch('/api/actualizar-matricula', {
+        method: 'POST',
+        body: formData
+      })
+      const json = await res.json()
+      if (json.ok) {
+        setResultadoActualizacion(json.resumen)
+      } else {
+        alert('Error: ' + json.error)
+      }
+    } catch (e) {
+      alert('Error al procesar el archivo')
+    } finally {
+      setActualizando(false)
+      // Reset input
+      const input = document.getElementById('archivoMatricula') as HTMLInputElement
+      if (input) input.value = ''
+    }
+  }
+
   if (status === 'loading') return <div className="min-h-screen flex items-center justify-center">Cargando...</div>
 
   const user = session?.user as any
@@ -103,7 +134,7 @@ export default function AdminPage() {
             <a href="/dashboard" className="text-sm text-gray-500 hover:text-gray-700">← Dashboard</a>
             <div>
               <h1 className="text-xl font-bold text-gray-800">Panel de Administrador</h1>
-              <p className="text-sm text-gray-500">Gestión de usuarios</p>
+              <p className="text-sm text-gray-500">Gestión de usuarios y matrícula</p>
             </div>
           </div>
           <div className="flex items-center gap-4">
@@ -113,7 +144,38 @@ export default function AdminPage() {
         </div>
       </header>
 
-      <main className="max-w-7xl mx-auto px-4 py-6">
+      <main className="max-w-7xl mx-auto px-4 py-6 space-y-6">
+
+        {/* Actualizar Matrícula */}
+        <div className="bg-white rounded-xl shadow-sm p-6">
+          <h2 className="font-semibold text-gray-700 mb-2">Actualizar Matrícula</h2>
+          <p className="text-sm text-gray-500 mb-4">Sube el archivo de Calificaciones Finales de Core para actualizar estudiantes e inscripciones.</p>
+          <div className="flex items-center gap-4">
+            <button
+              onClick={() => document.getElementById('archivoMatricula')?.click()}
+              disabled={actualizando}
+              className="bg-blue-600 text-white px-5 py-2.5 rounded-lg hover:bg-blue-700 disabled:opacity-50 transition text-sm font-medium"
+            >
+              {actualizando ? '⏳ Procesando...' : '📤 Subir Excel de Matrícula'}
+            </button>
+            <input
+              id="archivoMatricula"
+              type="file"
+              accept=".xlsx,.xls"
+              className="hidden"
+              onChange={handleActualizarMatricula}
+            />
+            {resultadoActualizacion && (
+              <div className="bg-green-50 border border-green-200 rounded-lg px-4 py-2 text-sm text-green-700">
+                ✅ Actualización completada — 
+                <span className="font-medium"> {resultadoActualizacion.estudiantesActualizados} estudiantes</span> y 
+                <span className="font-medium"> {resultadoActualizacion.matriculasActualizadas} matrículas</span> actualizadas
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Usuarios */}
         <div className="bg-white rounded-xl shadow-sm overflow-hidden">
           <div className="px-6 py-4 border-b border-gray-100 flex justify-between items-center">
             <h2 className="font-semibold text-gray-700">Usuarios ({usuarios.length})</h2>
@@ -166,6 +228,7 @@ export default function AdminPage() {
         </div>
       </main>
 
+      {/* Modal crear usuario */}
       {modal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-6">
