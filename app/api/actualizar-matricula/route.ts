@@ -11,7 +11,6 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'No se recibió archivo' }, { status: 400 })
     }
 
-    // Leer el Excel
     const buffer = await archivo.arrayBuffer()
     const workbook = XLSX.read(buffer, { type: 'array' })
     const sheet = workbook.Sheets[workbook.SheetNames[0]]
@@ -27,7 +26,6 @@ export async function POST(request: NextRequest) {
       clavesMap[c.clave] = c.id
     }
 
-    // Procesar filas del Excel
     const estudiantesNuevos: any[] = []
     const matriculasNuevas: { clave_id: number; estudiante_id_centro: string }[] = []
     const estudiantesMap: Record<string, any> = {}
@@ -38,9 +36,11 @@ export async function POST(request: NextRequest) {
       const joinKey = `${curso}-${seccion}`
       const clave_id = clavesMap[joinKey]
 
-      if (!clave_id) continue // Solo procesar grupos que están en claves
+      if (!clave_id) continue
 
-      const id_centro = String(row['Id'] || '').trim()
+      // Normalizar ID quitando ceros a la izquierda
+      const id_raw = String(row['Id'] || '').trim()
+      const id_centro = id_raw.replace(/^0+/, '') // quitar ceros iniciales
       const nombre = String(row['Nombre'] || '').trim()
       const programa = String(row['Programa'] || '').trim()
       const curriculo = String(row['Currículum'] || '').trim()
@@ -104,7 +104,6 @@ export async function POST(request: NextRequest) {
       resumen: {
         estudiantesActualizados,
         matriculasActualizadas,
-        gruposEncontrados: Object.keys(clavesMap).length,
       }
     })
   } catch (error: any) {
