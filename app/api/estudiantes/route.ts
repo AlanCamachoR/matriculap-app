@@ -1,55 +1,61 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
-import bcrypt from 'bcryptjs'
 
-export async function GET() {
+export async function GET(request: NextRequest) {
+  const { searchParams } = new URL(request.url)
+  const busqueda = searchParams.get('busqueda') || ''
+  const programa = searchParams.get('programa') || ''
+  const semestre = searchParams.get('semestre') || ''
+
   try {
-    const { data, error } = await supabaseAdmin
-      .from('usuarios')
-      .select('id, email, nombre, rol, licenciatura, created_at')
-      .order('created_at', { ascending: false })
+    let qClaves = supabaseAdmin
+      .from('claves')
+      .select('id, clave, semestre, materia, docente, licenciatura, grupo')
 
-    if (error) throw error
-    return NextResponse.json({ data })
-  } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 500 })
-  }
-}
+    if (busqueda) qClaves = qClaves.or(`clave.ilike.%${busqueda}%,materia.ilike.%${busqueda}%,docente.ilike.%${busqueda}%`)
+    if (semestre) qClaves = qClaves.eq('semestre', semestre)
+    if (programa) qClaves = qClaves.eq('licenciatura', programa)
 
-export async function POST(request: NextRequest) {
-  try {
-    const { email, password, nombre, rol, licenciatura } = await request.json()
+    const { data: claves, error: clavesError } = await qClaves
+    if (clavesError) throw clavesError
 
-    if (!email || !password || !nombre) {
-      return NextResponse.json({ error: 'Faltan datos' }, { status: 400 })
+    const claveIds = (claves || []).map(c => c.id)
+    if (claveIds.length === 0) return NextResponse.json({ data: [] })
+
+    const { data: matriculas, error: matError } = await supabaseAdmin
+      .from('matricula')
+      .select('id, estudiante_id, clave_id, estudiantes (id, id_centro, nombre, programa)')
+      .in('clave_id', claveIds)
+
+    if (matError) throw matError
+
+    const { data: firmas } = await supabaseAdmin
+      .from('firmas')
+      .select('clave_id, imagen_url, fecha')
+
+    const firmasMap: Record<number, { imagen_url: string; fecha: string }> = {}
+    for (const f of firmas || []) {
+      firmasMap[f.clave_id] = f
     }
 
-    const hash = await bcrypt.hash(password, 10)
+    const clavesMap: Record<number, any> = {}
+    for (const c of claves || []) {
+      clavesMap[c.id] = {
+        ...c,
+        estudiantes: [],
+        firma: firmasMap[c.id] || null,
+      }
+    }
 
-    const { data, error } = await supabaseAdmin
-      .from('usuarios')
-      .insert({ email, password_hash: hash, nombre, rol: rol || 'profesor', licenciatura })
-      .select('id, email, nombre, rol, licenciatura')
-      .single()
+    for (const m of matriculas || []) {
+      if (clavesMap[m.clave_id]) {
+        clavesMap[m.clave_id].estudiantes.push(m.estudiantes)
+      }
+    }
 
-    if (error) throw error
-    return NextResponse.json({ ok: true, data })
-  } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 500 })
-  }
-}
+    const data = Object.values(clavesMap).sort((a: any, b: any) => a.clave.localeCompare(b.clave))
 
-export async function DELETE(request: NextRequest) {
-  try {
-    const { id } = await request.json()
-
-    const { error } = await supabaseAdmin
-      .from('usuarios')
-      .delete()
-      .eq('id', id)
-
-    if (error) throw error
-    return NextResponse.json({ ok: true })
+    return NextResponse.json({ data })
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 })
   }

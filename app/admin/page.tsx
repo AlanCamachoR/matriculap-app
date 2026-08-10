@@ -23,8 +23,14 @@ export default function AdminPage() {
   const [error, setError] = useState('')
 
   const licenciaturas = [
-    'Arquitectura', 'Cine y Televisión', 'Comunicación Visual',
-    'Computación Creativa', 'Diseño', 'Fotografía', 'Publicidad'
+    'Arquitectura',
+    'Arquitectura de Interiores',
+    'Cine y Televisión',
+    'Comunicación Visual',
+    'Diseño Industrial',
+    'Diseño Textil y Moda',
+    'Mercadotecnia y Publicidad',
+    'Negocios e Industrias Creativas',
   ]
 
   useEffect(() => {

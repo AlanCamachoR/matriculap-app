@@ -126,6 +126,7 @@ export default function DashboardPage() {
           </div>
           <div className="flex items-center gap-4">
             <span className="text-sm text-gray-600">{user?.name}</span>
+            <a href="/resumen" className="text-sm text-blue-600 hover:text-blue-800 font-medium">📊 Resumen</a>
             {(user?.role === 'admin' || user?.rol === 'admin') && (
               <a href="/admin" className="text-sm text-purple-600 hover:text-purple-800 font-medium">⚙️ Admin</a>
             )}
@@ -225,7 +226,6 @@ export default function DashboardPage() {
               </div>
               <button onClick={() => { setModal(null); setImagen(null); setPreview(null) }} className="text-gray-400 hover:text-gray-600 text-xl">✕</button>
             </div>
-
             <div className="border-2 border-dashed border-gray-300 rounded-xl p-6 text-center mb-4 cursor-pointer hover:border-blue-400 transition" onClick={() => document.getElementById('fileInput')?.click()}>
               {preview ? (
                 <img src={preview} alt="preview" className="max-h-48 mx-auto rounded-lg object-contain" />
@@ -238,7 +238,6 @@ export default function DashboardPage() {
               )}
               <input id="fileInput" type="file" accept="image/*" className="hidden" onChange={handleImagen} />
             </div>
-
             <div className="flex gap-3">
               <button onClick={() => { setModal(null); setImagen(null); setPreview(null) }} className="flex-1 border border-gray-300 text-gray-600 py-2.5 rounded-lg hover:bg-gray-50 transition">Cancelar</button>
               <button onClick={handleSubirAcuse} disabled={!imagen || subiendo} className="flex-1 bg-blue-600 text-white py-2.5 rounded-lg hover:bg-blue-700 disabled:opacity-50 transition">
