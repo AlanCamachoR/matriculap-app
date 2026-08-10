@@ -22,6 +22,7 @@ export default function DashboardPage() {
   const [busqueda, setBusqueda] = useState('')
   const [semestre, setSemestre] = useState('')
   const [programa, setPrograma] = useState('')
+  const [estado, setEstado] = useState('')
   const [loading, setLoading] = useState(false)
   const [semestres, setSemestres] = useState<string[]>([])
   const [programas, setProgramas] = useState<string[]>([])
@@ -30,6 +31,7 @@ export default function DashboardPage() {
   const [preview, setPreview] = useState<string | null>(null)
   const [subiendo, setSubiendo] = useState(false)
   const [verFirma, setVerFirma] = useState<Clave | null>(null)
+  const [verEstudiantes, setVerEstudiantes] = useState<Clave | null>(null)
 
   useEffect(() => {
     if (status === 'unauthenticated') router.push('/login')
@@ -101,6 +103,13 @@ export default function DashboardPage() {
     }
   }
 
+  // Filtrar por estado
+  const clavesFiltradas = claves.filter(c => {
+    if (estado === 'firmado') return !!c.firma
+    if (estado === 'pendiente') return !c.firma
+    return true
+  })
+
   const firmados = claves.filter(c => c.firma).length
   const pendientes = claves.filter(c => !c.firma).length
 
@@ -127,15 +136,15 @@ export default function DashboardPage() {
 
         {/* Tarjetas resumen */}
         <div className="grid grid-cols-3 gap-4 mb-6">
-          <div className="bg-white rounded-xl shadow-sm p-4 text-center">
+          <div className="bg-white rounded-xl shadow-sm p-4 text-center cursor-pointer hover:shadow-md transition" onClick={() => setEstado('')}>
             <p className="text-3xl font-bold text-gray-800">{claves.length}</p>
             <p className="text-sm text-gray-500 mt-1">Total grupos</p>
           </div>
-          <div className="bg-white rounded-xl shadow-sm p-4 text-center">
+          <div className="bg-white rounded-xl shadow-sm p-4 text-center cursor-pointer hover:shadow-md transition" onClick={() => setEstado('firmado')}>
             <p className="text-3xl font-bold text-green-600">{firmados}</p>
             <p className="text-sm text-gray-500 mt-1">Acuses subidos</p>
           </div>
-          <div className="bg-white rounded-xl shadow-sm p-4 text-center">
+          <div className="bg-white rounded-xl shadow-sm p-4 text-center cursor-pointer hover:shadow-md transition" onClick={() => setEstado('pendiente')}>
             <p className="text-3xl font-bold text-orange-500">{pendientes}</p>
             <p className="text-sm text-gray-500 mt-1">Pendientes</p>
           </div>
@@ -152,8 +161,13 @@ export default function DashboardPage() {
             <option value="">Todos los semestres</option>
             {semestres.map(s => <option key={s} value={s}>{s}</option>)}
           </select>
-          {(busqueda || programa || semestre) && (
-            <button onClick={() => { setBusqueda(''); setPrograma(''); setSemestre('') }} className="px-4 py-2.5 text-sm text-gray-500 hover:text-gray-700 border border-gray-300 rounded-lg">Limpiar</button>
+          <select value={estado} onChange={(e) => setEstado(e.target.value)} className="border border-gray-300 rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white">
+            <option value="">Todos los estados</option>
+            <option value="firmado">✅ Firmados</option>
+            <option value="pendiente">⏳ Pendientes</option>
+          </select>
+          {(busqueda || programa || semestre || estado) && (
+            <button onClick={() => { setBusqueda(''); setPrograma(''); setSemestre(''); setEstado('') }} className="px-4 py-2.5 text-sm text-gray-500 hover:text-gray-700 border border-gray-300 rounded-lg">Limpiar</button>
           )}
         </div>
 
@@ -161,23 +175,23 @@ export default function DashboardPage() {
         <div className="bg-white rounded-xl shadow-sm overflow-hidden">
           <div className="px-6 py-4 border-b border-gray-100 flex justify-between items-center">
             <h2 className="font-semibold text-gray-700">Grupos</h2>
-            <span className="text-sm text-gray-500">{claves.length} grupos</span>
+            <span className="text-sm text-gray-500">{clavesFiltradas.length} grupos</span>
           </div>
 
           {loading ? (
             <div className="p-8 text-center text-gray-400">Cargando...</div>
           ) : (
             <div className="divide-y divide-gray-100">
-              {claves.map((c) => (
+              {clavesFiltradas.map((c) => (
                 <div key={c.id} className="px-6 py-4 flex items-center justify-between hover:bg-gray-50 transition">
-                  <div className="flex-1">
+                  <div className="flex-1 cursor-pointer" onClick={() => setVerEstudiantes(c)}>
                     <div className="flex items-center gap-3">
                       <span className="font-mono text-blue-600 font-medium text-sm">{c.clave}</span>
                       <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full">{c.semestre}</span>
                       <span className="text-xs bg-blue-50 text-blue-600 px-2 py-0.5 rounded-full">{c.licenciatura}</span>
                     </div>
                     <p className="text-gray-800 font-medium mt-1">{c.materia}</p>
-                    <p className="text-gray-500 text-sm">{c.docente} · {c.estudiantes.length} estudiantes</p>
+                    <p className="text-gray-500 text-sm">{c.docente} · <span className="text-blue-500 hover:underline">{c.estudiantes.length} estudiantes</span></p>
                   </div>
                   <div className="flex items-center gap-3">
                     {c.firma ? (
@@ -193,7 +207,7 @@ export default function DashboardPage() {
                   </div>
                 </div>
               ))}
-              {claves.length === 0 && (
+              {clavesFiltradas.length === 0 && (
                 <div className="p-8 text-center text-gray-400">No se encontraron grupos</div>
               )}
             </div>
@@ -238,7 +252,7 @@ export default function DashboardPage() {
         </div>
       )}
 
-      {/* Modal ver firma */}
+      {/* Modal ver acuse */}
       {verFirma && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-2xl p-6">
@@ -251,6 +265,33 @@ export default function DashboardPage() {
             </div>
             <img src={verFirma.firma?.imagen_url} alt="acuse" className="w-full rounded-xl object-contain max-h-96" />
             <p className="text-xs text-gray-400 mt-3 text-center">Subido el {new Date(verFirma.firma?.fecha || '').toLocaleDateString('es-MX', { dateStyle: 'long' })}</p>
+          </div>
+        </div>
+      )}
+
+      {/* Modal ver estudiantes */}
+      {verEstudiantes && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg p-6">
+            <div className="flex justify-between items-start mb-4">
+              <div>
+                <h2 className="font-bold text-gray-800 text-lg">{verEstudiantes.clave}</h2>
+                <p className="text-sm text-gray-600">{verEstudiantes.materia}</p>
+                <p className="text-xs text-gray-400">{verEstudiantes.docente} · {verEstudiantes.estudiantes.length} estudiantes</p>
+              </div>
+              <button onClick={() => setVerEstudiantes(null)} className="text-gray-400 hover:text-gray-600 text-xl">✕</button>
+            </div>
+            <div className="max-h-96 overflow-y-auto divide-y divide-gray-100">
+              {verEstudiantes.estudiantes.map((e, i) => (
+                <div key={e.id} className="py-2.5 flex items-center gap-3">
+                  <span className="text-xs text-gray-400 w-6">{i + 1}</span>
+                  <div>
+                    <p className="text-sm font-medium text-gray-800">{e.nombre}</p>
+                    <p className="text-xs text-gray-400 font-mono">{e.id_centro} · {e.programa}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
       )}
