@@ -8,6 +8,7 @@ interface Estudiante {
   id_centro: string
   nombre: string
   programa: string
+  irregular?: boolean
 }
 
 interface Clave {
@@ -350,7 +351,12 @@ export default function GrupoPage() {
                 <span className="text-xs text-gray-400 w-6">{i + 1}</span>
                 <div className="flex-1">
                   <p className="text-sm font-medium text-gray-800">{e.nombre}</p>
-                  <p className="text-xs text-gray-400 font-mono">{formatId(e.id_centro)} · {e.programa}</p>
+                  <p className="text-xs text-gray-400 font-mono">
+                    {formatId(e.id_centro)} · {e.programa}
+                    {e.irregular && (
+                      <span className="ml-2 text-xs bg-yellow-100 text-yellow-700 px-1.5 py-0.5 rounded-full">Irregular</span>
+                    )}
+                  </p>
                 </div>
                 {firmados.has(e.id) && <span className="text-xs text-green-600 font-medium">✅ Firmó</span>}
               </div>

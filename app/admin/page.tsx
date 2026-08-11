@@ -210,7 +210,7 @@ export default function AdminPage() {
               <input id="archivoMatricula" type="file" accept=".xlsx,.xls" className="hidden" onChange={handleActualizarMatricula} />
               {resultadoActualizacion && (
                 <div className="mt-3 bg-green-50 border border-green-200 rounded-lg px-3 py-2 text-xs text-green-700">
-                  ✅ {resultadoActualizacion.estudiantesActualizados} estudiantes, {resultadoActualizacion.matriculasActualizadas} matrículas
+ ✅ {resultadoActualizacion.estudiantesActualizados} estudiantes, {resultadoActualizacion.matriculasActualizadas} matrículas regulares, {resultadoActualizacion.irregularesInscritos || 0} irregulares
                 </div>
               )}
             </div>

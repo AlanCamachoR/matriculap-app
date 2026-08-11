@@ -41,7 +41,7 @@ export async function GET(request: NextRequest) {
     const [matriculasRes, firmasRes, seccionesRes] = await Promise.all([
       supabaseAdmin
         .from('matricula')
-        .select('id, estudiante_id, clave_id, estudiantes (id, id_centro, nombre, programa)')
+.select('id, estudiante_id, clave_id, irregular, estudiantes (id, id_centro, nombre, programa)')
         .in('clave_id', claveIds),
       supabaseAdmin
         .from('firmas')
