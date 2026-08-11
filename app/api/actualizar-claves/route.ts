@@ -13,8 +13,8 @@ export async function POST(request: NextRequest) {
     const sheet = workbook.Sheets[workbook.SheetNames[0]]
     const filas: any[] = XLSX.utils.sheet_to_json(sheet, { defval: '' })
 
-    let insertadas = 0
-    let actualizadas = 0
+    // Usar mapa para deduplicar claves repetidas
+    const payloadMap: Record<string, any> = {}
     let omitidas = 0
 
     for (const fila of filas) {
@@ -22,9 +22,8 @@ export async function POST(request: NextRequest) {
       const materia = String(fila['Materia'] || '').trim()
       const docente = String(fila['Docente'] || '').trim()
       const semestre = String(fila['Semestre'] || '').trim()
-      const licenciatura = String(fila['Licenciatura'] || '').trim()
       const enlace = String(fila['Enlace'] || '').trim() || null
-      const grupo = parseInt(fila['Grupo']) || 0
+      const grupo = Number(fila['Grupo']) || 0
       const bloque = String(fila['Bloque'] || '').trim() || null
 
       if (!clave || !materia || materia === 'Asignatura' || materia === 'OBSERVACIONES') {
@@ -32,29 +31,34 @@ export async function POST(request: NextRequest) {
         continue
       }
 
-      const { data: existente } = await supabaseAdmin
-        .from('claves')
-        .select('id')
-        .eq('clave', clave)
-        .single()
+      // Si ya existe la clave, solo actualizamos si esta fila tiene más info
+      if (!payloadMap[clave] || enlace) {
+        payloadMap[clave] = { clave, materia, docente, semestre, licenciatura: 'Estudios Integrales', enlace, grupo, bloque }
+      }
+    }
 
-      if (existente) {
-        const { error } = await supabaseAdmin
-          .from('claves')
-          .update({ materia, docente, semestre, licenciatura, enlace, grupo, bloque })
-          .eq('clave', clave)
-        if (!error) actualizadas++
+    const payload = Object.values(payloadMap)
+
+    // Upsert en batches de 50
+    let actualizadas = 0
+    let errores: string[] = []
+    const BATCH = 50
+    for (let i = 0; i < payload.length; i += BATCH) {
+      const batch = payload.slice(i, i + BATCH)
+      const { error } = await supabaseAdmin
+        .from('claves')
+        .upsert(batch, { onConflict: 'clave' })
+      if (error) {
+        errores.push(error.message)
+        console.log('Error upsert:', error.message, 'batch:', i)
       } else {
-        const { error } = await supabaseAdmin
-          .from('claves')
-          .insert({ clave, materia, docente, semestre, licenciatura, enlace, grupo, bloque })
-        if (!error) insertadas++
+        actualizadas += batch.length
       }
     }
 
     return NextResponse.json({
       ok: true,
-      resumen: { insertadas, actualizadas, omitidas }
+      resumen: { insertadas: 0, actualizadas, omitidas, errores }
     })
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 })
