@@ -36,24 +36,47 @@ export async function GET(request: NextRequest) {
       ])
 
       const grupoIds = (gruposRes.data || []).map((g: any) => g.id)
-      const { data: segMaterias } = grupoIds.length > 0
-        ? await supabaseAdmin
-            .from('seguimiento_materia')
-            .select('*')
-            .eq('docente_id', id)
-            .eq('ciclo', '2027-1')
-            .in('clave_id', grupoIds)
-        : { data: [] }
+
+      const [segMateriasRes, firmasRes] = await Promise.all([
+        grupoIds.length > 0
+          ? supabaseAdmin
+              .from('seguimiento_materia')
+              .select('*')
+              .eq('docente_id', id)
+              .eq('ciclo', '2027-1')
+              .in('clave_id', grupoIds)
+          : Promise.resolve({ data: [] }),
+        grupoIds.length > 0
+          ? supabaseAdmin
+              .from('firmas')
+              .select('clave_id')
+              .in('clave_id', grupoIds)
+          : Promise.resolve({ data: [] }),
+      ])
+
+      const firmasSet = new Set((firmasRes.data || []).map((f: any) => f.clave_id))
 
       const segMap: Record<number, any> = {}
-      for (const s of segMaterias || []) {
+      for (const s of segMateriasRes.data || []) {
         segMap[s.clave_id] = s
       }
 
-      const grupos = (gruposRes.data || []).map((g: any) => ({
-        ...g,
-        seguimiento: segMap[g.id] || null,
-      }))
+      const grupos = (gruposRes.data || []).map((g: any) => {
+        const seg = segMap[g.id] || null
+        const tieneAcuse = firmasSet.has(g.id)
+        return {
+          ...g,
+          seguimiento: {
+            asistencia: seg?.asistencia || null,
+            temarios_oficina: tieneAcuse ? 'SI' : (seg?.temarios_oficina || null),
+            temarios_bs: seg?.temarios_bs || null,
+            materiales_bibliografia: seg?.materiales_bibliografia || null,
+            evaluacion_intermedia: seg?.evaluacion_intermedia || null,
+            evaluacion_final: seg?.evaluacion_final || null,
+            publicacion_calificaciones: seg?.publicacion_calificaciones || null,
+          }
+        }
+      })
 
       let total = 0
       let completados = 0
