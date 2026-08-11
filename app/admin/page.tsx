@@ -23,17 +23,15 @@ export default function AdminPage() {
   const [error, setError] = useState('')
   const [actualizando, setActualizando] = useState(false)
   const [resultadoActualizacion, setResultadoActualizacion] = useState<any>(null)
+  const [actualizandoClaves, setActualizandoClaves] = useState(false)
+  const [resultadoClaves, setResultadoClaves] = useState<any>(null)
+  const [actualizandoSecciones, setActualizandoSecciones] = useState(false)
+  const [resultadoSecciones, setResultadoSecciones] = useState<any>(null)
 
   const licenciaturas = [
-    'Arquitectura',
-    'Arquitectura de Interiores',
-    'Cine y Televisión',
-    'Comunicación Visual',
-    'Computación Creativa',
-    'Diseño Industrial',
-    'Diseño Textil y Moda',
-    'Mercadotecnia y Publicidad',
-    'Negocios e Industrias Creativas',
+    'Arquitectura', 'Arquitectura de Interiores', 'Cine y Televisión',
+    'Comunicación Visual', 'Computación Creativa', 'Diseño Industrial',
+    'Diseño Textil y Moda', 'Mercadotecnia y Publicidad', 'Negocios e Industrias Creativas',
   ]
 
   useEffect(() => {
@@ -102,10 +100,7 @@ export default function AdminPage() {
     try {
       const formData = new FormData()
       formData.append('archivo', file)
-      const res = await fetch('/api/actualizar-matricula', {
-        method: 'POST',
-        body: formData
-      })
+      const res = await fetch('/api/actualizar-matricula', { method: 'POST', body: formData })
       const json = await res.json()
       if (json.ok) {
         setResultadoActualizacion(json.resumen)
@@ -116,8 +111,55 @@ export default function AdminPage() {
       alert('Error al procesar el archivo')
     } finally {
       setActualizando(false)
-      // Reset input
       const input = document.getElementById('archivoMatricula') as HTMLInputElement
+      if (input) input.value = ''
+    }
+  }
+
+  const handleActualizarClaves = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setActualizandoClaves(true)
+    setResultadoClaves(null)
+    try {
+      const formData = new FormData()
+      formData.append('archivo', file)
+      const res = await fetch('/api/actualizar-claves', { method: 'POST', body: formData })
+      const json = await res.json()
+      if (json.ok) {
+        setResultadoClaves(json.resumen)
+      } else {
+        alert('Error: ' + json.error)
+      }
+    } catch (e) {
+      alert('Error al procesar el archivo')
+    } finally {
+      setActualizandoClaves(false)
+      const input = document.getElementById('archivoClaves') as HTMLInputElement
+      if (input) input.value = ''
+    }
+  }
+
+  const handleActualizarSecciones = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setActualizandoSecciones(true)
+    setResultadoSecciones(null)
+    try {
+      const formData = new FormData()
+      formData.append('archivo', file)
+      const res = await fetch('/api/actualizar-secciones', { method: 'POST', body: formData })
+      const json = await res.json()
+      if (json.ok) {
+        setResultadoSecciones(json.resumen)
+      } else {
+        alert('Error: ' + json.error)
+      }
+    } catch (e) {
+      alert('Error al procesar el archivo')
+    } finally {
+      setActualizandoSecciones(false)
+      const input = document.getElementById('archivoSecciones') as HTMLInputElement
       if (input) input.value = ''
     }
   }
@@ -134,7 +176,7 @@ export default function AdminPage() {
             <a href="/dashboard" className="text-sm text-gray-500 hover:text-gray-700">← Dashboard</a>
             <div>
               <h1 className="text-xl font-bold text-gray-800">Panel de Administrador</h1>
-              <p className="text-sm text-gray-500">Gestión de usuarios y matrícula</p>
+              <p className="text-sm text-gray-500">Gestión de usuarios y datos</p>
             </div>
           </div>
           <div className="flex items-center gap-4">
@@ -146,32 +188,77 @@ export default function AdminPage() {
 
       <main className="max-w-7xl mx-auto px-4 py-6 space-y-6">
 
-        {/* Actualizar Matrícula */}
+        {/* Carga de archivos */}
         <div className="bg-white rounded-xl shadow-sm p-6">
-          <h2 className="font-semibold text-gray-700 mb-2">Actualizar Matrícula</h2>
-          <p className="text-sm text-gray-500 mb-4">Sube el archivo de Calificaciones Finales de Core para actualizar estudiantes e inscripciones.</p>
-          <div className="flex items-center gap-4">
-            <button
-              onClick={() => document.getElementById('archivoMatricula')?.click()}
-              disabled={actualizando}
-              className="bg-blue-600 text-white px-5 py-2.5 rounded-lg hover:bg-blue-700 disabled:opacity-50 transition text-sm font-medium"
-            >
-              {actualizando ? '⏳ Procesando...' : '📤 Subir Excel de Matrícula'}
-            </button>
-            <input
-              id="archivoMatricula"
-              type="file"
-              accept=".xlsx,.xls"
-              className="hidden"
-              onChange={handleActualizarMatricula}
-            />
-            {resultadoActualizacion && (
-              <div className="bg-green-50 border border-green-200 rounded-lg px-4 py-2 text-sm text-green-700">
-                ✅ Actualización completada — 
-                <span className="font-medium"> {resultadoActualizacion.estudiantesActualizados} estudiantes</span> y 
-                <span className="font-medium"> {resultadoActualizacion.matriculasActualizadas} matrículas</span> actualizadas
+          <h2 className="font-semibold text-gray-700 mb-4">Carga de archivos</h2>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+
+            {/* Matrícula */}
+            <div className="border border-gray-200 rounded-xl p-4">
+              <div className="flex items-center gap-2 mb-2">
+                <span className="text-2xl">🎓</span>
+                <h3 className="font-medium text-gray-700">Matrícula</h3>
               </div>
-            )}
+              <p className="text-xs text-gray-500 mb-4">CENTRO_Calificaciones_Finales — actualiza estudiantes e inscripciones</p>
+              <button
+                onClick={() => document.getElementById('archivoMatricula')?.click()}
+                disabled={actualizando}
+                className="w-full bg-blue-600 text-white px-4 py-2.5 rounded-lg hover:bg-blue-700 disabled:opacity-50 transition text-sm font-medium"
+              >
+                {actualizando ? '⏳ Procesando...' : '📤 Subir archivo'}
+              </button>
+              <input id="archivoMatricula" type="file" accept=".xlsx,.xls" className="hidden" onChange={handleActualizarMatricula} />
+              {resultadoActualizacion && (
+                <div className="mt-3 bg-green-50 border border-green-200 rounded-lg px-3 py-2 text-xs text-green-700">
+                  ✅ {resultadoActualizacion.estudiantesActualizados} estudiantes, {resultadoActualizacion.matriculasActualizadas} matrículas
+                </div>
+              )}
+            </div>
+
+            {/* Claves EI */}
+            <div className="border border-gray-200 rounded-xl p-4">
+              <div className="flex items-center gap-2 mb-2">
+                <span className="text-2xl">📋</span>
+                <h3 className="font-medium text-gray-700">Claves EI</h3>
+              </div>
+              <p className="text-xs text-gray-500 mb-4">Claves — actualiza grupos y materias de Estudios Integrales</p>
+              <button
+                onClick={() => document.getElementById('archivoClaves')?.click()}
+                disabled={actualizandoClaves}
+                className="w-full bg-orange-600 text-white px-4 py-2.5 rounded-lg hover:bg-orange-700 disabled:opacity-50 transition text-sm font-medium"
+              >
+                {actualizandoClaves ? '⏳ Procesando...' : '📤 Subir archivo'}
+              </button>
+              <input id="archivoClaves" type="file" accept=".xlsx,.xls" className="hidden" onChange={handleActualizarClaves} />
+              {resultadoClaves && (
+                <div className="mt-3 bg-green-50 border border-green-200 rounded-lg px-3 py-2 text-xs text-green-700">
+                  ✅ {resultadoClaves.insertadas} insertadas, {resultadoClaves.actualizadas} actualizadas, {resultadoClaves.omitidas} omitidas
+                </div>
+              )}
+            </div>
+
+            {/* Secciones */}
+            <div className="border border-gray-200 rounded-xl p-4">
+              <div className="flex items-center gap-2 mb-2">
+                <span className="text-2xl">🏫</span>
+                <h3 className="font-medium text-gray-700">Secciones EI</h3>
+              </div>
+              <p className="text-xs text-gray-500 mb-4">CENTRO_Secciones — actualiza aulas, Brightspace e inscritos de EI</p>
+              <button
+                onClick={() => document.getElementById('archivoSecciones')?.click()}
+                disabled={actualizandoSecciones}
+                className="w-full bg-purple-600 text-white px-4 py-2.5 rounded-lg hover:bg-purple-700 disabled:opacity-50 transition text-sm font-medium"
+              >
+                {actualizandoSecciones ? '⏳ Procesando...' : '📤 Subir archivo'}
+              </button>
+              <input id="archivoSecciones" type="file" accept=".xlsx,.xls" className="hidden" onChange={handleActualizarSecciones} />
+              {resultadoSecciones && (
+                <div className="mt-3 bg-green-50 border border-green-200 rounded-lg px-3 py-2 text-xs text-green-700">
+                  ✅ {resultadoSecciones.insertadas} insertadas, {resultadoSecciones.actualizadas} actualizadas, {resultadoSecciones.omitidas} omitidas
+                </div>
+              )}
+            </div>
+
           </div>
         </div>
 
@@ -183,7 +270,6 @@ export default function AdminPage() {
               + Nuevo usuario
             </button>
           </div>
-
           {loading ? (
             <div className="p-8 text-center text-gray-400">Cargando...</div>
           ) : (
@@ -211,9 +297,7 @@ export default function AdminPage() {
                       <td className="px-6 py-3 text-gray-600">{u.licenciatura || '— Todas —'}</td>
                       <td className="px-6 py-3">
                         {u.email !== 'admin@integrales.mx' && (
-                          <button onClick={() => handleEliminar(u.id, u.nombre)} className="text-red-500 hover:text-red-700 text-xs">
-                            Eliminar
-                          </button>
+                          <button onClick={() => handleEliminar(u.id, u.nombre)} className="text-red-500 hover:text-red-700 text-xs">Eliminar</button>
                         )}
                       </td>
                     </tr>
@@ -228,7 +312,6 @@ export default function AdminPage() {
         </div>
       </main>
 
-      {/* Modal crear usuario */}
       {modal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-6">

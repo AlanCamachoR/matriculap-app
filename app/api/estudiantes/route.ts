@@ -28,7 +28,6 @@ export async function GET(request: NextRequest) {
       .from('matricula')
       .select('id, estudiante_id, clave_id, estudiantes (id, id_centro, nombre, programa)')
       .in('clave_id', claveIds)
-
     if (matError) throw matError
 
     const { data: firmas } = await supabaseAdmin
@@ -42,13 +41,8 @@ export async function GET(request: NextRequest) {
 
     const clavesMap: Record<number, any> = {}
     for (const c of claves || []) {
-      clavesMap[c.id] = {
-        ...c,
-        estudiantes: [],
-        firma: firmasMap[c.id] || null,
-      }
+      clavesMap[c.id] = { ...c, estudiantes: [], firma: firmasMap[c.id] || null }
     }
-
     for (const m of matriculas || []) {
       if (clavesMap[m.clave_id]) {
         clavesMap[m.clave_id].estudiantes.push(m.estudiantes)
@@ -56,7 +50,6 @@ export async function GET(request: NextRequest) {
     }
 
     const data = Object.values(clavesMap).sort((a: any, b: any) => a.clave.localeCompare(b.clave))
-
     return NextResponse.json({ data })
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 })
