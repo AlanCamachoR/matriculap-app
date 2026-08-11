@@ -98,8 +98,8 @@ export async function GET(request: NextRequest) {
       })
     }
 
-    // Lista de docentes — queries en paralelo
-    const [docentesRes, segMateriasRes, todasClavesRes] = await Promise.all([
+    // Lista de docentes
+    const [docentesRes, segMateriasRes, todasClavesRes, firmasRes] = await Promise.all([
       (() => {
         let q = supabaseAdmin
           .from('docentes')
@@ -115,8 +115,11 @@ export async function GET(request: NextRequest) {
         .eq('ciclo', '2027-1'),
       supabaseAdmin
         .from('claves')
-        .select('docente')
+        .select('id, docente')
         .neq('docente', ''),
+      supabaseAdmin
+        .from('firmas')
+        .select('clave_id'),
     ])
 
     if (docentesRes.error) throw docentesRes.error
@@ -124,6 +127,7 @@ export async function GET(request: NextRequest) {
     const docentes = docentesRes.data || []
     const segMaterias = segMateriasRes.data || []
     const todasClaves = todasClavesRes.data || []
+    const firmasSet = new Set((firmasRes.data || []).map((f: any) => f.clave_id))
 
     const completadosMap: Record<number, number> = {}
     for (const s of segMaterias) {
@@ -136,11 +140,14 @@ export async function GET(request: NextRequest) {
     const data = docentes.map((d: any) => {
       if (!d.nombre) return { ...d, num_materias: 0, porcentaje: 0 }
       const nombreLower = d.nombre.toLowerCase()
-      const numMaterias = todasClaves.filter(c =>
+      const misClaves = (todasClaves || []).filter(c =>
         c.docente != null && c.docente.toLowerCase().includes(nombreLower)
-      ).length
+      )
+      const numMaterias = misClaves.length
+      const acusesExtra = misClaves.filter(c => firmasSet.has(c.id)).length
+      const totalCompletados = (completadosMap[d.id] || 0) + acusesExtra
       const porcentaje = numMaterias > 0
-        ? Math.round(((completadosMap[d.id] || 0) / (numMaterias * CAMPOS_SEG.length)) * 100)
+        ? Math.round((totalCompletados / (numMaterias * CAMPOS_SEG.length)) * 100)
         : 0
       return { ...d, num_materias: numMaterias, porcentaje }
     })
