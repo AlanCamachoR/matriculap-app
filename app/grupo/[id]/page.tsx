@@ -22,7 +22,6 @@ interface Clave {
   firma: { imagen_url: string; fecha: string } | null
 }
 
-// Formatea id_centro con 4 ceros al frente
 const formatId = (id: string) => `0000${id}`
 
 export default function GrupoPage() {
@@ -43,7 +42,6 @@ export default function GrupoPage() {
   const [copiado, setCopiado] = useState(false)
   const [busqueda, setBusqueda] = useState('')
   const [filtroFirma, setFiltroFirma] = useState<'todos' | 'firmados' | 'pendientes'>('todos')
-  const [acuseSubido, setAcuseSubido] = useState(false)
 
   useEffect(() => {
     if (status === 'unauthenticated') router.push('/login')
@@ -101,12 +99,34 @@ export default function GrupoPage() {
   const procesarRespuestaClaude = () => {
     if (!clave || !textoClaude) return
     const nuevosFirmados = new Set(firmados)
+
+    const normalizar = (texto: string) => texto
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^a-z\s]/g, '')
+      .trim()
+
+    const textoNorm = normalizar(textoClaude)
+
     for (const estudiante of clave.estudiantes) {
-      const partes = estudiante.nombre.toLowerCase().split(' ')
-      const textoLower = textoClaude.toLowerCase()
-      const encontrado = partes.some(parte => parte.length > 3 && textoLower.includes(parte))
+      const nombreNorm = normalizar(estudiante.nombre)
+      const partes = nombreNorm.split(' ').filter(p => p.length > 1)
+
+      const minCoincidencias = Math.min(partes.length, 3)
+      let encontrado = false
+
+      for (let i = 0; i <= partes.length - minCoincidencias; i++) {
+        const fragmento = partes.slice(i, i + minCoincidencias).join(' ')
+        if (textoNorm.includes(fragmento)) {
+          encontrado = true
+          break
+        }
+      }
+
       if (encontrado) nuevosFirmados.add(estudiante.id)
     }
+
     setFirmados(nuevosFirmados)
     setMostrarCampoTexto(false)
     setTextoClaude('')
@@ -152,7 +172,6 @@ export default function GrupoPage() {
       const res = await fetch('/api/firmas', { method: 'POST', body: formData })
       const json = await res.json()
       if (json.ok) {
-        setAcuseSubido(true)
         setImagen(null)
         setPreview(null)
         fetchGrupo()
@@ -164,8 +183,12 @@ export default function GrupoPage() {
     }
   }
 
-  if (status === 'loading' || loading) return <div className="min-h-screen flex items-center justify-center">Cargando...</div>
-  if (!clave) return <div className="min-h-screen flex items-center justify-center text-gray-400">Grupo no encontrado</div>
+  if (status === 'loading' || loading) return (
+    <div className="min-h-screen flex items-center justify-center">Cargando...</div>
+  )
+  if (!clave) return (
+    <div className="min-h-screen flex items-center justify-center text-gray-400">Grupo no encontrado</div>
+  )
 
   const user = session?.user as any
   const totalFirmados = firmados.size
@@ -204,7 +227,6 @@ export default function GrupoPage() {
 
       <main className="max-w-4xl mx-auto px-4 py-6">
 
-        {/* Resumen */}
         <div className="bg-white rounded-xl shadow-sm p-5 mb-6">
           <div className="flex justify-between items-center mb-3">
             <div>
@@ -214,11 +236,13 @@ export default function GrupoPage() {
             <span className={`text-2xl font-bold ${porcentaje === 100 ? 'text-green-600' : porcentaje >= 50 ? 'text-blue-600' : 'text-orange-500'}`}>{porcentaje}%</span>
           </div>
           <div className="w-full bg-gray-100 rounded-full h-3">
-            <div className={`h-3 rounded-full transition-all ${porcentaje === 100 ? 'bg-green-500' : porcentaje >= 50 ? 'bg-blue-500' : 'bg-orange-400'}`} style={{ width: `${porcentaje}%` }} />
+            <div
+              className={`h-3 rounded-full transition-all ${porcentaje === 100 ? 'bg-green-500' : porcentaje >= 50 ? 'bg-blue-500' : 'bg-orange-400'}`}
+              style={{ width: `${porcentaje}%` }}
+            />
           </div>
         </div>
 
-        {/* Acciones */}
         <div className="bg-white rounded-xl shadow-sm p-5 mb-6">
           <h2 className="font-semibold text-gray-700 mb-4">Acciones</h2>
           <div className="flex flex-wrap gap-3">
@@ -249,7 +273,6 @@ export default function GrupoPage() {
           )}
         </div>
 
-        {/* Foto acuse */}
         <div className="bg-white rounded-xl shadow-sm p-5 mb-6">
           <h2 className="font-semibold text-gray-700 mb-4">Foto del acuse (respaldo)</h2>
           {clave.firma ? (
@@ -272,17 +295,10 @@ export default function GrupoPage() {
                 <div className="text-center">
                   <img src={preview} alt="preview" className="max-h-48 mx-auto rounded-lg object-contain mb-4" />
                   <div className="flex gap-3 justify-center">
-                    <button
-                      onClick={() => { setImagen(null); setPreview(null) }}
-                      className="border border-gray-300 text-gray-600 px-4 py-2 rounded-lg text-sm hover:bg-gray-50 transition"
-                    >
+                    <button onClick={() => { setImagen(null); setPreview(null) }} className="border border-gray-300 text-gray-600 px-4 py-2 rounded-lg text-sm hover:bg-gray-50 transition">
                       Cambiar foto
                     </button>
-                    <button
-                      onClick={subirFotoAcuse}
-                      disabled={subiendoFoto}
-                      className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-blue-700 disabled:opacity-50 transition"
-                    >
+                    <button onClick={subirFotoAcuse} disabled={subiendoFoto} className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-blue-700 disabled:opacity-50 transition">
                       {subiendoFoto ? 'Subiendo...' : '⬆️ Subir foto'}
                     </button>
                   </div>
@@ -293,7 +309,6 @@ export default function GrupoPage() {
           )}
         </div>
 
-        {/* Lista de estudiantes */}
         <div className="bg-white rounded-xl shadow-sm overflow-hidden">
           <div className="px-6 py-4 border-b border-gray-100 flex justify-between items-center">
             <h2 className="font-semibold text-gray-700">Lista de estudiantes</h2>

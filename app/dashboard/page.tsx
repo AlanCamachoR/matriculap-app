@@ -11,6 +11,10 @@ interface Clave {
   docente: string
   licenciatura: string
   grupo: number
+  enlace: string | null
+  salon: string | null
+  altas: number
+  brightspace: string | null
   estudiantes: { id: number; id_centro: string; nombre: string; programa: string }[]
   firma: { imagen_url: string; fecha: string } | null
 }
@@ -31,12 +35,8 @@ const LICENCIATURAS = [
 
 const formatId = (id: string) => `0000${id}`
 
-// Quita acentos y pasa a minúsculas
 function normalizar(texto: string): string {
-  return texto
-    .toLowerCase()
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
+  return texto.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
 }
 
 export default function DashboardPage() {
@@ -71,13 +71,11 @@ export default function DashboardPage() {
     return () => clearTimeout(timer)
   }, [semestre, programa])
 
-  // Buscar grupos cuando cambia el campo de grupo
   useEffect(() => {
     const timer = setTimeout(() => fetchClaves(), 350)
     return () => clearTimeout(timer)
   }, [busquedaGrupo])
 
-  // Buscar estudiantes cuando cambia el campo de estudiante
   useEffect(() => {
     const timer = setTimeout(() => {
       if (busquedaEstudiante.trim().length >= 2) {
@@ -165,11 +163,9 @@ export default function DashboardPage() {
     setEstudianteSeleccionado(null)
   }
 
-  // Filtro adicional del lado cliente con normalización de acentos
   const clavesFiltradas = claves.filter(c => {
     const coincidePrograma = !programa || (c.estudiantes || []).some(e => e.programa === programa)
     const coincideEstado = !estado || (estado === 'firmado' ? !!c.firma : !c.firma)
-    // Filtro extra client-side por docente/materia sin acento
     const coincideBusqueda = !busquedaGrupo || (
       normalizar(c.materia).includes(normalizar(busquedaGrupo)) ||
       normalizar(c.docente).includes(normalizar(busquedaGrupo)) ||
@@ -290,8 +286,6 @@ export default function DashboardPage() {
 
         {/* Contenido según tab */}
         {tabActivo === 'estudiante' ? (
-
-          /* Vista estudiantes */
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             {busquedaEstudiante.trim().length < 2 ? (
               <div className="md:col-span-3 bg-white rounded-xl shadow-sm p-8 text-center text-gray-400">
@@ -392,12 +386,26 @@ export default function DashboardPage() {
                 {clavesFiltradas.map((c) => (
                   <div key={c.id} className="px-6 py-4 flex items-center justify-between hover:bg-gray-50 transition">
                     <div className="flex-1 cursor-pointer" onClick={() => router.push(`/grupo/${c.id}`)}>
-                      <div className="flex items-center gap-3">
+                      <div className="flex items-center gap-3 flex-wrap">
                         <span className="font-mono text-blue-600 font-medium text-sm">{c.clave}</span>
                         <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full">{c.semestre}</span>
+                        {c.salon && (
+                          <span className="text-xs bg-purple-50 text-purple-600 px-2 py-0.5 rounded-full">🏫 {c.salon}</span>
+                        )}
+                        {(c.brightspace || c.enlace) && (
+                          <button
+                            onClick={(e) => { e.stopPropagation(); window.open((c.brightspace || c.enlace)!, '_blank') }}
+                            className="text-xs bg-blue-50 text-blue-600 px-2 py-0.5 rounded-full border border-blue-200 hover:bg-blue-100 transition"
+                          >
+                            🔗 Brightspace
+                          </button>
+                        )}
                       </div>
                       <p className="text-gray-800 font-medium mt-1">{c.materia}</p>
-                      <p className="text-gray-500 text-sm">{c.docente} · {c.estudiantes?.length || 0} estudiantes</p>
+                      <p className="text-gray-500 text-sm mt-0.5">
+                        {c.docente} · {c.estudiantes?.length || 0} inscritos
+                        {c.altas > 0 && <span className="text-gray-400"> (cap. {c.altas})</span>}
+                      </p>
                     </div>
                     <div className="flex items-center gap-3">
                       {c.firma ? (
