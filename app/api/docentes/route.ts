@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
 
-const CAMPOS_SEG = ['asistencia', 'temarios_oficina', 'temarios_bs', 'materiales_bibliografia', 'evaluacion_intermedia', 'evaluacion_final', 'publicacion_calificaciones']
+const CAMPOS_SEG = ['asistencia', 'temarios_oficina', 'temarios_bs', 'evaluacion_intermedia', 'evaluacion_final', 'publicacion_calificaciones']
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url)
@@ -30,8 +30,8 @@ export async function GET(request: NextRequest) {
           .from('claves')
           .select('id, clave, materia, semestre, grupo, enlace')
           .ilike('docente', `%${docente.nombre}%`)
-          .not('materia', 'in', '("Asignatura","OBSERVACIONES","Sección")')
-          .not('materia', 'is', null)
+          .not('materia', 'in', '("Asignatura","OBSERVACIONES","Seccion")')
+          .neq('materia', '')
           .order('clave'),
       ])
 
@@ -75,48 +75,52 @@ export async function GET(request: NextRequest) {
       })
     }
 
-    // Lista de docentes
-    let query = supabaseAdmin
-      .from('docentes')
-      .select('id, id_centro, nombre, correo_centro, forma_pago, tabulador')
-      .order('nombre')
+    // Lista de docentes — queries en paralelo
+    const [docentesRes, segMateriasRes, todasClavesRes] = await Promise.all([
+      (() => {
+        let q = supabaseAdmin
+          .from('docentes')
+          .select('id, id_centro, nombre, correo_centro, forma_pago, tabulador')
+          .order('nombre')
+          .limit(200)
+        if (busqueda) q = q.ilike('nombre', `%${busqueda}%`)
+        return q
+      })(),
+      supabaseAdmin
+        .from('seguimiento_materia')
+        .select('docente_id, asistencia, temarios_oficina, temarios_bs, evaluacion_intermedia, evaluacion_final, publicacion_calificaciones')
+        .eq('ciclo', '2027-1'),
+      supabaseAdmin
+        .from('claves')
+        .select('docente')
+        .neq('docente', ''),
+    ])
 
-    if (busqueda) query = query.ilike('nombre', `%${busqueda}%`)
+    if (docentesRes.error) throw docentesRes.error
 
-    const { data: docentes, error } = await query.limit(200)
-    if (error) throw error
+    const docentes = docentesRes.data || []
+    const segMaterias = segMateriasRes.data || []
+    const todasClaves = todasClavesRes.data || []
 
-    const { data: claves } = await supabaseAdmin
-      .from('claves')
-      .select('id, docente')
-
-    const conteoMap: Record<string, number> = {}
-    for (const c of claves || []) {
-      if (!conteoMap[c.docente]) conteoMap[c.docente] = 0
-      conteoMap[c.docente]++
-    }
-
-    const { data: segMaterias } = await supabaseAdmin
-      .from('seguimiento_materia')
-      .select('docente_id, asistencia, temarios_oficina, temarios_bs, materiales_bibliografia, evaluacion_intermedia, evaluacion_final, publicacion_calificaciones')
-      .eq('ciclo', '2027-1')
-
-    const avanceMap: Record<number, { total: number; completados: number }> = {}
-    for (const s of segMaterias || []) {
-      if (!avanceMap[s.docente_id]) avanceMap[s.docente_id] = { total: 0, completados: 0 }
+    const completadosMap: Record<number, number> = {}
+    for (const s of segMaterias) {
+      if (!completadosMap[s.docente_id]) completadosMap[s.docente_id] = 0
       for (const c of CAMPOS_SEG) {
-        avanceMap[s.docente_id].total++
-        if ((s as any)[c] === 'SI') avanceMap[s.docente_id].completados++
+        if ((s as any)[c] === 'SI') completadosMap[s.docente_id]++
       }
     }
 
-    const data = (docentes || []).map((d: any) => ({
-      ...d,
-      num_materias: conteoMap[d.nombre] || 0,
-      porcentaje: avanceMap[d.id]
-        ? Math.round((avanceMap[d.id].completados / avanceMap[d.id].total) * 100)
-        : 0,
-    }))
+    const data = docentes.map((d: any) => {
+      if (!d.nombre) return { ...d, num_materias: 0, porcentaje: 0 }
+      const nombreLower = d.nombre.toLowerCase()
+      const numMaterias = todasClaves.filter(c =>
+        c.docente != null && c.docente.toLowerCase().includes(nombreLower)
+      ).length
+      const porcentaje = numMaterias > 0
+        ? Math.round(((completadosMap[d.id] || 0) / (numMaterias * CAMPOS_SEG.length)) * 100)
+        : 0
+      return { ...d, num_materias: numMaterias, porcentaje }
+    })
 
     return NextResponse.json({ data })
   } catch (error: any) {

@@ -41,9 +41,8 @@ interface Docente {
 
 const CAMPOS = [
   { key: 'asistencia', label: 'Asistencia' },
-  { key: 'temarios_oficina', label: 'Temarios Oficina' },
+  { key: 'temarios_oficina', label: 'Acuse de Programa' },
   { key: 'temarios_bs', label: 'Temarios BS' },
-  { key: 'materiales_bibliografia', label: 'Materiales' },
   { key: 'evaluacion_intermedia', label: 'Eval. Intermedia' },
   { key: 'evaluacion_final', label: 'Eval. Final' },
   { key: 'publicacion_calificaciones', label: 'Publicacion Cal.' },
@@ -179,13 +178,27 @@ export default function DocenteDetallePage() {
 
   const user = session?.user as any
   const totalGrupos = docente.grupos.length
-  const porcentaje = docente.porcentaje
+
+  const porcentaje = (() => {
+    let total = 0, completados = 0
+    for (const g of docente.grupos) {
+      const seg = segs[g.id] || {}
+      for (const c of CAMPOS) {
+        total++
+        if (seg[c.key as keyof SegMateria] === 'SI') completados++
+      }
+    }
+    return total > 0 ? Math.round((completados / total) * 100) : 0
+  })()
 
   return (
     <div className="min-h-screen bg-gray-50">
       <header className="bg-white shadow-sm">
         <div className="max-w-7xl mx-auto px-4 py-4 flex justify-between items-center">
           <div className="flex items-center gap-4">
+            <button onClick={() => router.push('/dashboard')} className="text-sm text-gray-500 hover:text-gray-700">
+              Dashboard
+            </button>
             <button onClick={() => router.push('/docentes')} className="text-sm text-gray-500 hover:text-gray-700">
               Docentes
             </button>
@@ -228,12 +241,12 @@ export default function DocenteDetallePage() {
               </span>
             </div>
             <div>
-              <p className="text-xs text-gray-400 mb-1">Tabulador</p>
-              <p className="text-sm font-medium text-gray-800">{docente.tabulador || '-'}</p>
-            </div>
-            <div>
               <p className="text-xs text-gray-400 mb-1">Materias asignadas</p>
               <p className="text-2xl font-bold text-blue-600">{totalGrupos}</p>
+            </div>
+            <div>
+              <p className="text-xs text-gray-400 mb-1">Correo personal</p>
+              <p className="text-sm text-gray-800">{docente.correo_personal || '-'}</p>
             </div>
             <div>
               <p className="text-xs text-gray-400 mb-2">Avance de cumplimiento</p>
@@ -251,22 +264,14 @@ export default function DocenteDetallePage() {
             </div>
           </div>
 
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-4 pt-4 border-t border-gray-100 text-sm">
-            <div>
-              <p className="text-gray-400 text-xs mb-1">Correo personal</p>
-              <p className="text-gray-800">{docente.correo_personal || '-'}</p>
-            </div>
+          <div className="grid grid-cols-2 gap-4 mt-4 pt-4 border-t border-gray-100 text-sm">
             <div>
               <p className="text-gray-400 text-xs mb-1">Contacto</p>
               <p className="text-gray-800">{docente.contacto || '-'}</p>
             </div>
             <div>
-              <p className="text-gray-400 text-xs mb-1">Fecha de ingreso</p>
-              <p className="text-gray-800">{docente.fecha_ingreso || '-'}</p>
-            </div>
-            <div>
-              <p className="text-gray-400 text-xs mb-1">Extranjero</p>
-              <p className="text-gray-800">{docente.extranjero || '-'}</p>
+              <p className="text-gray-400 text-xs mb-1">Correo Centro</p>
+              <p className="text-gray-800">{docente.correo_centro || '-'}</p>
             </div>
           </div>
         </div>
@@ -327,7 +332,7 @@ export default function DocenteDetallePage() {
                 </div>
 
                 <div className="px-5 py-4">
-                  <div className="grid grid-cols-2 md:grid-cols-7 gap-2">
+                  <div className="grid grid-cols-2 md:grid-cols-6 gap-2">
                     {CAMPOS.map(campo => {
                       const val = seg[campo.key as keyof SegMateria] as string | null
                       return (
