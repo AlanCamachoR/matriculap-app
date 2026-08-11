@@ -6,19 +6,15 @@ export async function GET(request: NextRequest) {
   const busqueda = searchParams.get('busqueda') || ''
 
   try {
-    // Buscar estudiantes
+    // Llamamos la función RPC que usa unaccent en PostgreSQL
     const { data: estudiantes, error: estError } = await supabaseAdmin
-      .from('estudiantes')
-      .select('id, id_centro, nombre, programa, curriculo')
-      .or(`nombre.ilike.%${busqueda}%,id_centro.ilike.%${busqueda}%`)
-      .limit(20)
+      .rpc('buscar_estudiantes', { termino: busqueda })
 
     if (estError) throw estError
     if (!estudiantes || estudiantes.length === 0) return NextResponse.json({ data: [] })
 
-    const estIds = estudiantes.map(e => e.id)
+    const estIds = estudiantes.map((e: any) => e.id)
 
-    // Obtener matrículas con claves
     const { data: matriculas, error: matError } = await supabaseAdmin
       .from('matricula')
       .select(`
@@ -27,17 +23,14 @@ export async function GET(request: NextRequest) {
         claves (id, clave, materia, docente, semestre, licenciatura)
       `)
       .in('estudiante_id', estIds)
-
     if (matError) throw matError
 
-    // Obtener firmas individuales
     const { data: firmasInd } = await supabaseAdmin
       .from('firmas_estudiantes')
       .select('estudiante_id, clave_id, firmado')
       .in('estudiante_id', estIds)
       .eq('firmado', true)
 
-    // Obtener acuses de grupo
     const { data: acuses } = await supabaseAdmin
       .from('firmas')
       .select('clave_id')
@@ -45,17 +38,14 @@ export async function GET(request: NextRequest) {
     const acusesSet = new Set((acuses || []).map(a => a.clave_id))
     const firmasIndSet = new Set((firmasInd || []).map(f => `${f.estudiante_id}_${f.clave_id}`))
 
-    // Agrupar por estudiante
     const gruposMap: Record<number, any[]> = {}
     for (const m of matriculas || []) {
       if (!gruposMap[m.estudiante_id]) gruposMap[m.estudiante_id] = []
       const c = m.claves as any
       if (!c) continue
-
       const firmado =
         firmasIndSet.has(`${m.estudiante_id}_${m.clave_id}`) ||
         acusesSet.has(m.clave_id)
-
       gruposMap[m.estudiante_id].push({
         clave: c.clave,
         materia: c.materia,
@@ -66,8 +56,7 @@ export async function GET(request: NextRequest) {
       })
     }
 
-    // Construir respuesta
-    const data = estudiantes.map(e => ({
+    const data = (estudiantes as any[]).map(e => ({
       ...e,
       grupos: (gruposMap[e.id] || []).sort((a: any, b: any) => a.clave.localeCompare(b.clave))
     }))

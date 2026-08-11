@@ -29,11 +29,22 @@ const LICENCIATURAS = [
   'Diseño Textil y Moda', 'Mercadotecnia y Publicidad', 'Negocios e Industrias Creativas',
 ]
 
+const formatId = (id: string) => `0000${id}`
+
+// Quita acentos y pasa a minúsculas
+function normalizar(texto: string): string {
+  return texto
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+}
+
 export default function DashboardPage() {
   const { data: session, status } = useSession()
   const router = useRouter()
   const [claves, setClaves] = useState<Clave[]>([])
-  const [busqueda, setBusqueda] = useState('')
+  const [busquedaGrupo, setBusquedaGrupo] = useState('')
+  const [busquedaEstudiante, setBusquedaEstudiante] = useState('')
   const [semestre, setSemestre] = useState('')
   const [programa, setPrograma] = useState('')
   const [estado, setEstado] = useState('')
@@ -46,53 +57,50 @@ export default function DashboardPage() {
   const [verFirma, setVerFirma] = useState<Clave | null>(null)
   const [estudiantes, setEstudiantes] = useState<EstudianteResultado[]>([])
   const [estudianteSeleccionado, setEstudianteSeleccionado] = useState<EstudianteResultado | null>(null)
-  const [modoEstudiante, setModoEstudiante] = useState(false)
   const [loadingEst, setLoadingEst] = useState(false)
+  const [tabActivo, setTabActivo] = useState<'grupos' | 'estudiante'>('grupos')
 
   useEffect(() => {
     if (status === 'unauthenticated') router.push('/login')
   }, [status, router])
 
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      if (busqueda.trim()) {
-        // Detectar si parece nombre de estudiante (letras) o clave/materia
-        const esNombre = /^[a-záéíóúüñA-ZÁÉÍÓÚÜÑ\s]+$/.test(busqueda.trim()) && busqueda.trim().length > 2
-        if (esNombre) {
-          setModoEstudiante(true)
-          buscarEstudiante()
-        } else {
-          setModoEstudiante(false)
-          fetchClaves()
-        }
-      } else {
-        setModoEstudiante(false)
-        setEstudiantes([])
-        setEstudianteSeleccionado(null)
-        fetchClaves()
-      }
-    }, 400)
-    return () => clearTimeout(timer)
-  }, [busqueda])
+  useEffect(() => { fetchClaves() }, [])
 
   useEffect(() => {
-    const timer = setTimeout(() => fetchClaves(), 300)
+    const timer = setTimeout(() => fetchClaves(), 350)
     return () => clearTimeout(timer)
   }, [semestre, programa])
 
-  useEffect(() => { fetchClaves() }, [])
+  // Buscar grupos cuando cambia el campo de grupo
+  useEffect(() => {
+    const timer = setTimeout(() => fetchClaves(), 350)
+    return () => clearTimeout(timer)
+  }, [busquedaGrupo])
+
+  // Buscar estudiantes cuando cambia el campo de estudiante
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (busquedaEstudiante.trim().length >= 2) {
+        buscarEstudiante()
+      } else {
+        setEstudiantes([])
+        setEstudianteSeleccionado(null)
+      }
+    }, 400)
+    return () => clearTimeout(timer)
+  }, [busquedaEstudiante])
 
   const fetchClaves = async () => {
     setLoading(true)
     try {
       const params = new URLSearchParams()
-      if (busqueda && !modoEstudiante) params.set('busqueda', busqueda)
+      if (busquedaGrupo) params.set('busqueda', busquedaGrupo)
       if (semestre) params.set('semestre', semestre)
       const res = await fetch(`/api/estudiantes?${params}`)
       const json = await res.json()
       const data: Clave[] = json.data || []
       setClaves(data)
-      if (!busqueda && !semestre) {
+      if (!busquedaGrupo && !semestre) {
         const sems = [...new Set(data.map(c => c.semestre).filter(Boolean))] as string[]
         setSemestres(sems.sort())
       }
@@ -104,10 +112,10 @@ export default function DashboardPage() {
   }
 
   const buscarEstudiante = async () => {
-    if (!busqueda.trim()) return
+    if (!busquedaEstudiante.trim()) return
     setLoadingEst(true)
     try {
-      const res = await fetch(`/api/estudiantes-detalle?busqueda=${encodeURIComponent(busqueda)}`)
+      const res = await fetch(`/api/estudiantes-detalle?busqueda=${encodeURIComponent(busquedaEstudiante)}`)
       const json = await res.json()
       setEstudiantes(json.data || [])
     } catch (e) {
@@ -147,14 +155,32 @@ export default function DashboardPage() {
     }
   }
 
+  const limpiarTodo = () => {
+    setBusquedaGrupo('')
+    setBusquedaEstudiante('')
+    setPrograma('')
+    setSemestre('')
+    setEstado('')
+    setEstudiantes([])
+    setEstudianteSeleccionado(null)
+  }
+
+  // Filtro adicional del lado cliente con normalización de acentos
   const clavesFiltradas = claves.filter(c => {
     const coincidePrograma = !programa || (c.estudiantes || []).some(e => e.programa === programa)
     const coincideEstado = !estado || (estado === 'firmado' ? !!c.firma : !c.firma)
-    return coincidePrograma && coincideEstado
+    // Filtro extra client-side por docente/materia sin acento
+    const coincideBusqueda = !busquedaGrupo || (
+      normalizar(c.materia).includes(normalizar(busquedaGrupo)) ||
+      normalizar(c.docente).includes(normalizar(busquedaGrupo)) ||
+      normalizar(c.clave).includes(normalizar(busquedaGrupo))
+    )
+    return coincidePrograma && coincideEstado && coincideBusqueda
   })
 
   const firmados = claves.filter(c => c.firma).length
   const pendientes = claves.filter(c => !c.firma).length
+  const hayFiltros = busquedaGrupo || busquedaEstudiante || programa || semestre || estado
 
   if (status === 'loading') return <div className="min-h-screen flex items-center justify-center">Cargando...</div>
 
@@ -170,7 +196,8 @@ export default function DashboardPage() {
           </div>
           <div className="flex items-center gap-4">
             <span className="text-sm text-gray-600">{user?.name}</span>
-<a href="/docentes" className="text-sm text-orange-600 hover:text-orange-800 font-medium">👨‍🏫 Docentes</a>            {(user?.role === 'admin' || user?.rol === 'admin') && (
+            <a href="/docentes" className="text-sm text-orange-600 hover:text-orange-800 font-medium">👨‍🏫 Docentes</a>
+            {(user?.role === 'admin' || user?.rol === 'admin') && (
               <a href="/admin" className="text-sm text-purple-600 hover:text-purple-800 font-medium">⚙️ Admin</a>
             )}
             <button onClick={() => signOut({ callbackUrl: '/login' })} className="text-sm text-red-500 hover:text-red-700">Cerrar sesión</button>
@@ -179,6 +206,7 @@ export default function DashboardPage() {
       </header>
 
       <main className="max-w-7xl mx-auto px-4 py-6">
+
         {/* Tarjetas */}
         <div className="grid grid-cols-3 gap-4 mb-6">
           <div className="bg-white rounded-xl shadow-sm p-4 text-center cursor-pointer hover:shadow-md transition" onClick={() => setEstado('')}>
@@ -195,48 +223,82 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        {/* Filtros */}
-        <div className="bg-white rounded-xl shadow-sm p-4 mb-6">
-          <div className="flex flex-col md:flex-row gap-3">
-            <div className="flex-1 relative">
-              <input
-                type="text"
-                value={busqueda}
-                onChange={(e) => setBusqueda(e.target.value)}
-                placeholder="Buscar por nombre de estudiante, clave, materia o docente..."
-                className="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-              {busqueda && (
-                <span className={`absolute right-3 top-2.5 text-xs px-2 py-0.5 rounded-full ${modoEstudiante ? 'bg-green-100 text-green-600' : 'bg-blue-100 text-blue-600'}`}>
-                  {modoEstudiante ? '🎓 Estudiante' : '📋 Grupo'}
-                </span>
-              )}
-            </div>
-            {!modoEstudiante && <>
-              <select value={programa} onChange={(e) => setPrograma(e.target.value)} className="border border-gray-300 rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white">
-                <option value="">Todas las licenciaturas</option>
-                {LICENCIATURAS.map(l => <option key={l} value={l}>{l}</option>)}
-              </select>
-              <select value={semestre} onChange={(e) => setSemestre(e.target.value)} className="border border-gray-300 rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white">
-                <option value="">Todos los semestres</option>
-                {semestres.map(s => <option key={s} value={s}>{s}</option>)}
-              </select>
-              <select value={estado} onChange={(e) => setEstado(e.target.value)} className="border border-gray-300 rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white">
-                <option value="">Todos los estados</option>
-                <option value="firmado">✅ Firmados</option>
-                <option value="pendiente">⏳ Pendientes</option>
-              </select>
-            </>}
-            {(busqueda || programa || semestre || estado) && (
-              <button onClick={() => { setBusqueda(''); setPrograma(''); setSemestre(''); setEstado(''); setModoEstudiante(false); setEstudiantes([]); setEstudianteSeleccionado(null) }} className="px-4 py-2.5 text-sm text-gray-500 hover:text-gray-700 border border-gray-300 rounded-lg">Limpiar</button>
+        {/* Tabs */}
+        <div className="bg-white rounded-xl shadow-sm mb-6 overflow-hidden">
+          <div className="flex border-b border-gray-100">
+            <button
+              onClick={() => setTabActivo('grupos')}
+              className={`flex-1 py-3 text-sm font-medium transition ${tabActivo === 'grupos' ? 'text-blue-600 border-b-2 border-blue-600 bg-blue-50' : 'text-gray-500 hover:text-gray-700'}`}
+            >
+              📋 Buscar por docente o materia
+            </button>
+            <button
+              onClick={() => setTabActivo('estudiante')}
+              className={`flex-1 py-3 text-sm font-medium transition ${tabActivo === 'estudiante' ? 'text-green-600 border-b-2 border-green-600 bg-green-50' : 'text-gray-500 hover:text-gray-700'}`}
+            >
+              🎓 Buscar estudiante
+            </button>
+          </div>
+
+          <div className="p-4">
+            {tabActivo === 'grupos' ? (
+              <div className="flex flex-col md:flex-row gap-3">
+                <div className="flex-1">
+                  <input
+                    type="text"
+                    value={busquedaGrupo}
+                    onChange={(e) => setBusquedaGrupo(e.target.value)}
+                    placeholder="Buscar por docente, materia o clave del grupo..."
+                    className="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    autoFocus
+                  />
+                </div>
+                <select value={programa} onChange={(e) => setPrograma(e.target.value)} className="border border-gray-300 rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white">
+                  <option value="">Todas las licenciaturas</option>
+                  {LICENCIATURAS.map(l => <option key={l} value={l}>{l}</option>)}
+                </select>
+                <select value={semestre} onChange={(e) => setSemestre(e.target.value)} className="border border-gray-300 rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white">
+                  <option value="">Todos los semestres</option>
+                  {semestres.map(s => <option key={s} value={s}>{s}</option>)}
+                </select>
+                <select value={estado} onChange={(e) => setEstado(e.target.value)} className="border border-gray-300 rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white">
+                  <option value="">Todos los estados</option>
+                  <option value="firmado">✅ Firmados</option>
+                  <option value="pendiente">⏳ Pendientes</option>
+                </select>
+                {hayFiltros && (
+                  <button onClick={limpiarTodo} className="px-4 py-2.5 text-sm text-gray-500 hover:text-gray-700 border border-gray-300 rounded-lg whitespace-nowrap">Limpiar</button>
+                )}
+              </div>
+            ) : (
+              <div className="flex gap-3">
+                <input
+                  type="text"
+                  value={busquedaEstudiante}
+                  onChange={(e) => setBusquedaEstudiante(e.target.value)}
+                  placeholder="Buscar por nombre o ID del estudiante..."
+                  className="flex-1 border border-gray-300 rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-green-500"
+                  autoFocus
+                />
+                {hayFiltros && (
+                  <button onClick={limpiarTodo} className="px-4 py-2.5 text-sm text-gray-500 hover:text-gray-700 border border-gray-300 rounded-lg">Limpiar</button>
+                )}
+              </div>
             )}
           </div>
         </div>
 
-        {/* Vista estudiantes */}
-        {modoEstudiante ? (
+        {/* Contenido según tab */}
+        {tabActivo === 'estudiante' ? (
+
+          /* Vista estudiantes */
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {loadingEst ? (
+            {busquedaEstudiante.trim().length < 2 ? (
+              <div className="md:col-span-3 bg-white rounded-xl shadow-sm p-8 text-center text-gray-400">
+                <p className="text-4xl mb-3">🎓</p>
+                <p>Escribe al menos 2 caracteres para buscar un estudiante</p>
+              </div>
+            ) : loadingEst ? (
               <div className="md:col-span-3 bg-white rounded-xl shadow-sm p-8 text-center text-gray-400">Buscando estudiantes...</div>
             ) : estudiantes.length > 0 ? (
               <>
@@ -246,9 +308,9 @@ export default function DashboardPage() {
                   </div>
                   <div className="divide-y divide-gray-100">
                     {estudiantes.map(e => (
-                      <div key={e.id} onClick={() => setEstudianteSeleccionado(e)} className={`px-4 py-3 cursor-pointer hover:bg-gray-50 transition ${estudianteSeleccionado?.id === e.id ? 'bg-blue-50 border-l-4 border-blue-500' : ''}`}>
+                      <div key={e.id} onClick={() => setEstudianteSeleccionado(e)} className={`px-4 py-3 cursor-pointer hover:bg-gray-50 transition ${estudianteSeleccionado?.id === e.id ? 'bg-green-50 border-l-4 border-green-500' : ''}`}>
                         <p className="font-medium text-gray-800 text-sm">{e.nombre}</p>
-                        <p className="text-xs text-gray-400 font-mono">{e.id_centro} · {e.programa}</p>
+                        <p className="text-xs text-gray-400 font-mono">{formatId(e.id_centro)} · {e.programa}</p>
                       </div>
                     ))}
                   </div>
@@ -260,7 +322,7 @@ export default function DashboardPage() {
                       <div className="flex items-start justify-between">
                         <div>
                           <h2 className="text-xl font-bold text-gray-800">{estudianteSeleccionado.nombre}</h2>
-                          <p className="text-sm text-gray-500 mt-1 font-mono">{estudianteSeleccionado.id_centro}</p>
+                          <p className="text-sm text-gray-500 mt-1 font-mono">{formatId(estudianteSeleccionado.id_centro)}</p>
                           <span className="text-xs bg-blue-50 text-blue-600 px-2 py-1 rounded-full mt-2 inline-block">{estudianteSeleccionado.programa}</span>
                         </div>
                         <div className="text-right">
@@ -310,11 +372,13 @@ export default function DashboardPage() {
               </>
             ) : (
               <div className="md:col-span-3 bg-white rounded-xl shadow-sm p-8 text-center text-gray-400">
-                No se encontraron estudiantes con "{busqueda}"
+                No se encontraron estudiantes con "{busquedaEstudiante}"
               </div>
             )}
           </div>
+
         ) : (
+
           /* Vista grupos */
           <div className="bg-white rounded-xl shadow-sm overflow-hidden">
             <div className="px-6 py-4 border-b border-gray-100 flex justify-between items-center">
@@ -350,7 +414,9 @@ export default function DashboardPage() {
                   </div>
                 ))}
                 {clavesFiltradas.length === 0 && (
-                  <div className="p-8 text-center text-gray-400">No se encontraron grupos</div>
+                  <div className="p-8 text-center text-gray-400">
+                    {busquedaGrupo ? `No se encontraron grupos con "${busquedaGrupo}"` : 'No se encontraron grupos'}
+                  </div>
                 )}
               </div>
             )}

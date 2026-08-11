@@ -22,6 +22,9 @@ interface Clave {
   firma: { imagen_url: string; fecha: string } | null
 }
 
+// Formatea id_centro con 4 ceros al frente
+const formatId = (id: string) => `0000${id}`
+
 export default function GrupoPage() {
   const { data: session, status } = useSession()
   const router = useRouter()
@@ -86,7 +89,9 @@ export default function GrupoPage() {
 
   const copiarLista = () => {
     if (!clave) return
-    const lista = clave.estudiantes.map((e, i) => `${i + 1}. ${e.nombre} (${e.id_centro})`).join('\n')
+    const lista = clave.estudiantes
+      .map((e, i) => `${i + 1}. ${e.nombre} (${formatId(e.id_centro)})`)
+      .join('\n')
     const texto = `Grupo: ${clave.clave}\nMateria: ${clave.materia}\nDocente: ${clave.docente}\n\nLista de estudiantes:\n${lista}`
     navigator.clipboard.writeText(texto)
     setCopiado(true)
@@ -170,7 +175,8 @@ export default function GrupoPage() {
   const estudiantesFiltrados = clave.estudiantes.filter(e => {
     const coincideBusqueda = busqueda === '' ||
       e.nombre.toLowerCase().includes(busqueda.toLowerCase()) ||
-      e.id_centro.includes(busqueda)
+      e.id_centro.includes(busqueda) ||
+      formatId(e.id_centro).includes(busqueda)
     const coincideFirma =
       filtroFirma === 'todos' ||
       (filtroFirma === 'firmados' && firmados.has(e.id)) ||
@@ -329,7 +335,7 @@ export default function GrupoPage() {
                 <span className="text-xs text-gray-400 w-6">{i + 1}</span>
                 <div className="flex-1">
                   <p className="text-sm font-medium text-gray-800">{e.nombre}</p>
-                  <p className="text-xs text-gray-400 font-mono">{e.id_centro} · {e.programa}</p>
+                  <p className="text-xs text-gray-400 font-mono">{formatId(e.id_centro)} · {e.programa}</p>
                 </div>
                 {firmados.has(e.id) && <span className="text-xs text-green-600 font-medium">✅ Firmó</span>}
               </div>
