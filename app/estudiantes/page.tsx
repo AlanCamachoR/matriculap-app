@@ -1,194 +1,181 @@
 'use client'
-import { useSession, signOut } from 'next-auth/react'
-import { useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
+const PROGRAMAS = [
+  'Arquitectura', 'Arquitectura de Interiores', 'Cine y Televisión',
+  'Comunicación Visual', 'Computación Creativa', 'Diseño Industrial',
+  'Diseño Textil y Moda', 'Estudios Integrales', 'Mercadotecnia y Publicidad',
+  'Negocios e Industrias Creativas',
+]
 
-interface Grupo {
-  clave: string
-  materia: string
-  docente: string
-  semestre: string
-  licenciatura: string
-  firmado: boolean
-}
+const SEMESTRES = ['1°','2°','3°','4°','5°','6°']
 
 interface Estudiante {
   id: number
   id_centro: string
   nombre: string
   programa: string
-  curriculo: string
-  grupos: Grupo[]
+  carrera: string
+  materias_count: number
+  firmadas: number
+  no_firmadas: number
+  total_faltas: number | null
+  min_pct_asistencia: number | null
 }
 
 export default function EstudiantesPage() {
-  const { data: session, status } = useSession()
   const router = useRouter()
-  const [busqueda, setBusqueda] = useState('')
   const [estudiantes, setEstudiantes] = useState<Estudiante[]>([])
+  const [busqueda, setBusqueda] = useState('')
+  const [programa, setPrograma] = useState('')
+  const [semestre, setSemestre] = useState('')
+  const [filtroCritico, setFiltroCritico] = useState(false)
   const [loading, setLoading] = useState(false)
-  const [seleccionado, setSeleccionado] = useState<Estudiante | null>(null)
 
   useEffect(() => {
-    if (status === 'unauthenticated') router.push('/login')
-  }, [status, router])
-
-  const buscar = async () => {
-    if (!busqueda.trim()) return
-    setLoading(true)
-    setSeleccionado(null)
-    try {
-      const res = await fetch(`/api/estudiantes-detalle?busqueda=${encodeURIComponent(busqueda)}`)
+    const delay = busqueda ? 350 : 0
+    const timer = setTimeout(async () => {
+      setLoading(true)
+      const params = new URLSearchParams()
+      if (busqueda.trim().length >= 2) params.set('q', busqueda.trim())
+      if (programa) params.set('programa', programa)
+      if (semestre) params.set('semestre', semestre)
+      const res = await fetch(`/api/estudiantes/lista?${params}`)
       const json = await res.json()
       setEstudiantes(json.data || [])
-    } catch (e) {
-      console.error(e)
-    } finally {
       setLoading(false)
-    }
-  }
+    }, delay)
+    return () => clearTimeout(timer)
+  }, [busqueda, programa, semestre])
 
-  if (status === 'loading') return <div className="min-h-screen flex items-center justify-center">Cargando...</div>
+  const pendientes = (e: Estudiante) => Number(e.materias_count) - Number(e.firmadas) - Number(e.no_firmadas)
 
-  const user = session?.user as any
+  // Casos críticos: porcentaje asistencia < 80% en al menos una materia
+  const lista = filtroCritico
+    ? estudiantes.filter(e => e.min_pct_asistencia != null && Number(e.min_pct_asistencia) < 80)
+    : estudiantes
+  // Ordenar críticos por min_pct_asistencia asc
+  const listaOrdenada = filtroCritico
+    ? [...lista].sort((a, b) => Number(a.min_pct_asistencia ?? 100) - Number(b.min_pct_asistencia ?? 100))
+    : lista
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <header className="bg-white shadow-sm">
-        <div className="max-w-7xl mx-auto px-4 py-4 flex justify-between items-center">
-          <div className="flex items-center gap-4">
-            <a href="/dashboard" className="text-sm text-gray-500 hover:text-gray-700">← Dashboard</a>
-            <div>
-              <h1 className="text-xl font-bold text-gray-800">Estudiantes</h1>
-              <p className="text-sm text-gray-500">Búsqueda de estudiantes y sus grupos</p>
-            </div>
-          </div>
-          <div className="flex items-center gap-4">
-            <span className="text-sm text-gray-600">{user?.name}</span>
-            <button onClick={() => signOut({ callbackUrl: '/login' })} className="text-sm text-red-500 hover:text-red-700">Cerrar sesión</button>
-          </div>
+      <main className="max-w-6xl mx-auto px-4 py-6">
+        <div className="flex items-center justify-between mb-6">
+          <h1 className="text-2xl font-bold text-gray-900">Estudiantes</h1>
+          <span className="text-sm text-gray-400">{listaOrdenada.length} resultados</span>
         </div>
-      </header>
 
-      <main className="max-w-7xl mx-auto px-4 py-6">
-
-        {/* Buscador */}
-        <div className="bg-white rounded-xl shadow-sm p-5 mb-6">
-          <h2 className="font-semibold text-gray-700 mb-3">Buscar estudiante</h2>
-          <div className="flex gap-3">
-            <input
-              type="text"
-              value={busqueda}
-              onChange={(e) => setBusqueda(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && buscar()}
-              placeholder="Nombre o ID del estudiante..."
-              className="flex-1 border border-gray-300 rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
+        {/* Filtros */}
+        <div className="flex gap-3 mb-3 flex-wrap">
+          <input
+            type="text"
+            placeholder="Buscar por nombre o matrícula..."
+            value={busqueda}
+            onChange={e => setBusqueda(e.target.value)}
+            className="flex-1 min-w-60 border border-gray-300 rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+          <select
+            value={programa}
+            onChange={e => setPrograma(e.target.value)}
+            className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+          >
+            <option value="">Todos los programas</option>
+            {PROGRAMAS.map(p => <option key={p} value={p}>{p}</option>)}
+          </select>
+          <select
+            value={semestre}
+            onChange={e => setSemestre(e.target.value)}
+            className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+          >
+            <option value="">Todos los semestres</option>
+            {SEMESTRES.map(s => <option key={s} value={s}>{s} semestre</option>)}
+          </select>
+          {(busqueda || programa || semestre) && (
             <button
-              onClick={buscar}
-              disabled={loading || !busqueda.trim()}
-              className="bg-blue-600 text-white px-6 py-2.5 rounded-lg hover:bg-blue-700 disabled:opacity-50 transition font-medium"
+              onClick={() => { setBusqueda(''); setPrograma(''); setSemestre('') }}
+              className="px-3 py-2 text-sm border border-gray-300 rounded-lg text-gray-500 hover:bg-gray-50"
             >
-              {loading ? 'Buscando...' : 'Buscar'}
+              Limpiar
             </button>
-          </div>
+          )}
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-
-          {/* Lista de resultados */}
-          {estudiantes.length > 0 && (
-            <div className="bg-white rounded-xl shadow-sm overflow-hidden">
-              <div className="px-4 py-3 border-b border-gray-100">
-                <p className="text-sm font-medium text-gray-600">{estudiantes.length} resultado{estudiantes.length !== 1 ? 's' : ''}</p>
-              </div>
-              <div className="divide-y divide-gray-100">
-                {estudiantes.map(e => (
-                  <div
-                    key={e.id}
-                    onClick={() => setSeleccionado(e)}
-                    className={`px-4 py-3 cursor-pointer hover:bg-gray-50 transition ${seleccionado?.id === e.id ? 'bg-blue-50 border-l-4 border-blue-500' : ''}`}
-                  >
-                    <p className="font-medium text-gray-800 text-sm">{e.nombre}</p>
-                    <p className="text-xs text-gray-400 font-mono">{e.id_centro} · {e.programa}</p>
-                  </div>
-                ))}
-              </div>
-            </div>
+        {/* Filtro casos críticos */}
+        <div className="mb-5 flex gap-2 items-center">
+          <button
+            onClick={() => setFiltroCritico(p => !p)}
+            className={`text-xs px-3 py-1.5 rounded-full border font-medium transition ${filtroCritico ? 'bg-red-500 text-white border-red-500' : 'bg-white text-gray-500 border-gray-300 hover:border-red-400 hover:text-red-500'}`}
+          >
+            ⚠ Casos críticos (&lt;80% asistencia)
+          </button>
+          {filtroCritico && (
+            <span className="text-xs text-gray-400">{listaOrdenada.length} estudiantes</span>
           )}
+        </div>
 
-          {/* Detalle del estudiante */}
-          {seleccionado && (
-            <div className="md:col-span-2 space-y-4">
-
-              {/* Info general */}
-              <div className="bg-white rounded-xl shadow-sm p-5">
-                <div className="flex items-start justify-between">
-                  <div>
-                    <h2 className="text-xl font-bold text-gray-800">{seleccionado.nombre}</h2>
-                    <p className="text-sm text-gray-500 mt-1 font-mono">{seleccionado.id_centro}</p>
-                    <div className="flex gap-2 mt-2">
-                      <span className="text-xs bg-blue-50 text-blue-600 px-2 py-1 rounded-full">{seleccionado.programa}</span>
-                      {seleccionado.curriculo && (
-                        <span className="text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded-full">{seleccionado.curriculo}</span>
-                      )}
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-2xl font-bold text-blue-600">{seleccionado.grupos.length}</p>
-                    <p className="text-xs text-gray-400">grupos inscritos</p>
-                  </div>
-                </div>
-
-                {/* Estadística de firmas */}
-                <div className="mt-4 grid grid-cols-2 gap-3">
-                  <div className="bg-green-50 rounded-lg p-3 text-center">
-                    <p className="text-xl font-bold text-green-600">{seleccionado.grupos.filter(g => g.firmado).length}</p>
-                    <p className="text-xs text-gray-500">grupos firmados</p>
-                  </div>
-                  <div className="bg-orange-50 rounded-lg p-3 text-center">
-                    <p className="text-xl font-bold text-orange-500">{seleccionado.grupos.filter(g => !g.firmado).length}</p>
-                    <p className="text-xs text-gray-500">grupos pendientes</p>
-                  </div>
-                </div>
-              </div>
-
-              {/* Lista de grupos */}
-              <div className="bg-white rounded-xl shadow-sm overflow-hidden">
-                <div className="px-5 py-3 border-b border-gray-100">
-                  <h3 className="font-semibold text-gray-700">Grupos inscritos</h3>
-                </div>
-                <div className="divide-y divide-gray-100">
-                  {seleccionado.grupos.map((g, i) => (
-                    <div key={i} className={`px-5 py-3 ${g.firmado ? 'bg-green-50' : ''}`}>
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <div className="flex items-center gap-2 mb-1">
-                            <span className="font-mono text-blue-600 text-sm font-medium">{g.clave}</span>
-                            <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full">{g.semestre}</span>
+        {/* Tabla */}
+        <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+          {loading ? (
+            <div className="p-12 text-center text-gray-400 text-sm">Cargando...</div>
+          ) : estudiantes.length === 0 ? (
+            <div className="p-12 text-center text-gray-400 text-sm">No se encontraron estudiantes</div>
+          ) : (
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-gray-100 text-xs text-gray-500 uppercase tracking-wide">
+                  <th className="px-4 py-3 text-left font-medium">Estudiante</th>
+                  <th className="px-4 py-3 text-left font-medium">Programa</th>
+                  <th className="px-4 py-3 text-center font-medium">Materias</th>
+                  <th className="px-4 py-3 text-center font-medium">Firmadas</th>
+                  <th className="px-4 py-3 text-center font-medium">Pendientes</th>
+                  <th className="px-4 py-3 text-center font-medium">Asistencia mín.</th>
+                  <th className="px-4 py-3 text-center font-medium">Estado</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-50">
+                {listaOrdenada.map(e => {
+                  const total = Number(e.materias_count)
+                  const firmadas = Number(e.firmadas)
+                  const pend = pendientes(e)
+                  const pct = total > 0 ? Math.round((firmadas / total) * 100) : 0
+                  const minPct = e.min_pct_asistencia != null ? Math.round(Number(e.min_pct_asistencia)) : null
+                  const asistColor = minPct == null ? 'text-gray-300' : minPct < 70 ? 'text-red-600 font-bold' : minPct < 80 ? 'text-orange-500 font-medium' : 'text-green-600'
+                  return (
+                    <tr
+                      key={e.id}
+                      onClick={() => router.push(`/estudiantes/${e.id}`)}
+                      className="hover:bg-blue-50 cursor-pointer transition-colors"
+                    >
+                      <td className="px-4 py-3">
+                        <div className="font-medium text-gray-900">{e.nombre}</div>
+                        <div className="text-xs text-gray-400">{e.id_centro}</div>
+                      </td>
+                      <td className="px-4 py-3 text-gray-600 text-xs">{e.programa}</td>
+                      <td className="px-4 py-3 text-center text-gray-700">{total}</td>
+                      <td className="px-4 py-3 text-center text-green-600 font-medium">{firmadas}</td>
+                      <td className="px-4 py-3 text-center">
+                        {pend > 0
+                          ? <span className="text-orange-500 font-medium">{pend}</span>
+                          : <span className="text-gray-300">—</span>}
+                      </td>
+                      <td className={`px-4 py-3 text-center ${asistColor}`}>
+                        {minPct != null ? `${minPct}%` : '—'}
+                      </td>
+                      <td className="px-4 py-3 text-center">
+                        <div className="flex items-center justify-center gap-2">
+                          <div className="w-16 bg-gray-100 rounded-full h-1.5">
+                            <div className="bg-green-500 h-1.5 rounded-full" style={{ width: `${pct}%` }} />
                           </div>
-                          <p className="text-sm font-medium text-gray-800">{g.materia}</p>
-                          <p className="text-xs text-gray-500 mt-0.5">👨‍🏫 {g.docente}</p>
+                          <span className={`text-xs font-medium ${pct === 100 ? 'text-green-600' : 'text-gray-500'}`}>{pct}%</span>
                         </div>
-                        <div>
-                          {g.firmado
-                            ? <span className="text-xs text-green-600 bg-green-100 px-2 py-1 rounded-full font-medium">✅ Firmó</span>
-                            : <span className="text-xs text-orange-500 bg-orange-50 px-2 py-1 rounded-full">⏳ Pendiente</span>
-                          }
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Estado vacío */}
-          {estudiantes.length === 0 && !loading && busqueda && (
-            <div className="md:col-span-3 bg-white rounded-xl shadow-sm p-8 text-center text-gray-400">
-              No se encontraron estudiantes con "{busqueda}"
-            </div>
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
           )}
         </div>
       </main>
